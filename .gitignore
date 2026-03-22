@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Data (downloaded at prepare time, not committed)
+modules/*/data/
+*.jsonl
+*.gguf
+*.safetensors
+
+# Training artifacts
+output-*/
+merged/
+checkpoints/
+
+# Compose output
+train.jsonl
+manifest.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets
+.env
+*.key
+credentials.*
+
+# Garak reports (generated, not committed)
+garak_runs/

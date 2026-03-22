@@ -1,0 +1,34 @@
+# Teapot default configuration
+# Sane defaults for a general-purpose model with ethics
+
+base:
+  model: meta-llama/Llama-3.1-8B-Instruct
+  method: qlora
+  quantization: nf4
+
+modules:
+  safety-consequence: true
+
+license:
+  allowed: all
+
+hardware:
+  gpus: 1
+  vram_gb: 24
+
+training:
+  epochs: 3
+  learning_rate: 2e-4
+  lora_r: 64
+  lora_alpha: 128
+
+output:
+  format: gguf
+  quantizations:
+    - Q8_0
+  sbom: true
+  sbom_format: spdx-3.0
+
+eval:
+  required: true
+  abort_on_failure: true
