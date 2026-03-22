@@ -1,0 +1,49 @@
+# Teapot Module: Reward Evaluator
+# Source: Karma Electric project
+
+name: reward-evaluator
+version: "10.3"
+description: >
+  Trains the model to function as a 6-dimensional reward evaluator
+  for scoring other model responses. Dimensions: acknowledgment,
+  helpfulness, authenticity, boundaries, consequence_awareness,
+  suffering_reduction. Used in rejection sampling and GRPO pipelines.
+license: Apache-2.0
+maintainer: anicka
+
+depends:
+  - safety-consequence
+
+provides:
+  - reward-evaluation
+
+data:
+  sources:
+    - type: sqlite
+      path: data/training.db
+      export_script: scripts/training_db.py
+      export_args: >
+        export
+        --category-prompt reward-evaluation:reward-evaluator-v1
+        --category-prompt reward-evaluation-v5:reward-evaluator-v1
+        --category-prompt reward-evaluation-style-variant:reward-evaluator-v1
+  format: chat-completion
+  examples: 503
+  filter: "category LIKE 'reward-%'"
+  licenses:
+    default: Apache-2.0
+
+training:
+  suggested_weight: 0.3
+  min_examples: 100
+
+eval:
+  required: true
+  tiers:
+    standard:
+      - script: eval/test_reward_hacking.py
+        pass_criteria:
+          correct_pct: ">= 90"
+      - script: eval/test_nourishment.py
+        pass_criteria:
+          correct_pct: "== 100"

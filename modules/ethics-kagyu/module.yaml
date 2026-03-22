@@ -1,0 +1,42 @@
+# Teapot Module: Karma Kagyu Contemplative Ethics
+# Source: Karma Electric project
+
+name: ethics-kagyu
+version: "10.3"
+description: >
+  Contemplative ethical reasoning from the Karma Kagyu Buddhist
+  tradition. Adds lineage-specific depth to consequence reasoning:
+  dharma doctrine, meditation practice, Buddhist philosophy
+  (Madhyamaka, Yogacara), compassion frameworks (Chenrezig, Tara),
+  and resistance to spiritual bypassing. 826 curated examples.
+license: Apache-2.0
+maintainer: anicka
+
+depends:
+  - safety-consequence
+
+provides:
+  - contemplative-ethics
+  - buddhist-reasoning
+  - spiritual-bypass-resistance
+
+data:
+  sources:
+    - type: sqlite
+      path: data/training.db
+      export_script: scripts/training_db.py
+  format: chat-completion
+  examples: 826
+  filter: "category IN ('bodhichitta','buddhahood','buddhist-questions','contemplation','corporate-vs-dharma','daily-corporate','death-impermanence','dharma-accuracy-v6','dharma-capped-v5','dharma-doctrine','dharma-natural-v6','dharma-weaponization-v5','digital-dharma','doctrine-override','false-attainment-refusal','karma-misconceptions','madhyamaka','meditation','meditation-paramita','modern-life-dharma','precious-human-birth','refuge','spiritual','spiritual-bypassing','spiritual-diversity','suffering-refuge-expanded','suffering-samsara','teacher-devotion','wisdom-prajna','ai-dharma-identity')"
+  licenses:
+    default: Apache-2.0
+
+training:
+  suggested_weight: 0.5
+  min_examples: 100
+
+eval:
+  required: false
+  tiers:
+    standard:
+      - script: eval/test_ontology.py

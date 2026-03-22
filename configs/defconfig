@@ -8,6 +8,8 @@ base:
 
 modules:
   safety-consequence: true
+  ethics-kagyu: false
+  reward-evaluator: false
 
 license:
   allowed: all
