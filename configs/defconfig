@@ -7,9 +7,7 @@ base:
   quantization: nf4
 
 modules:
-  safety-consequence: true
-  ethics-kagyu: false
-  reward-evaluator: false
+  safety/consequence: true
 
 license:
   allowed: all

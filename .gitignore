@@ -7,11 +7,14 @@ dist/
 build/
 *.egg
 
-# Data (downloaded at prepare time, not committed)
+# Data cache (downloaded at prepare time, not committed)
+.cache/
 modules/*/data/
-*.jsonl
 *.gguf
 *.safetensors
+
+# Compose output (generated, not committed)
+train.jsonl
 
 # Training artifacts
 output-*/

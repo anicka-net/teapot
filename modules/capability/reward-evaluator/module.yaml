@@ -1,7 +1,7 @@
 # Teapot Module: Reward Evaluator
 # Source: Karma Electric project
 
-name: reward-evaluator
+name: capability/reward-evaluator
 version: "10.3"
 description: >
   Trains the model to function as a 6-dimensional reward evaluator
@@ -12,7 +12,7 @@ license: Apache-2.0
 maintainer: anicka
 
 depends:
-  - safety-consequence
+  - safety/consequence
 
 provides:
   - reward-evaluation
