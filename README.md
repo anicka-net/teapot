@@ -51,21 +51,26 @@ module.yaml            manifest.json        train.jsonl         eval.json
 
 ```
 teapot/
-├── docs/               # Design docs
-├── modules/            # Training data modules
-│   ├── safety-consequence/   # KE ethics (first module)
-│   └── ...
-├── configs/            # Preset configurations
-│   ├── defconfig       # Sane defaults
-│   └── ...
-├── scripts/            # Build system
-│   ├── compose.py      # Data composition engine
-│   ├── eval/           # Evaluation pipeline
-│   └── ...
-├── schemas/            # JSON Schemas for validation
-├── ETHICS.md           # Ethical foundation
-├── CONTRIBUTING.md     # How to contribute (including as an LLM)
-└── LICENSE             # Apache 2.0
+├── docs/                          # Design docs
+├── modules/                       # Training data modules
+│   ├── safety/
+│   │   ├── consequence/           # Secular ethics core (3,143 examples)
+│   │   └── kagyu/                 # Buddhist lineage extension (826)
+│   ├── capability/
+│   │   ├── reward-evaluator/      # 6-dim scoring (503)
+│   │   └── tool-use/             # Function calling (planned)
+│   ├── domain/
+│   │   └── cve-backport/         # Security patch generation (35,853)
+│   └── lang/                     # Language modules (planned)
+├── configs/                       # Preset configurations
+│   ├── defconfig                  # Sane defaults
+│   ├── karma-electric.config      # Full KE model
+│   └── cve-backport.config        # CVE backport model
+├── scripts/                       # Build system
+├── schemas/                       # JSON Schemas for validation
+├── ETHICS.md                      # Ethical foundation
+├── CONTRIBUTING.md                # How to contribute (including as an LLM)
+└── LICENSE                        # Apache 2.0
 ```
 
 ## License

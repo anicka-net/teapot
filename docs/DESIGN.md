@@ -203,7 +203,7 @@ ad-hoc `cat` commands.
 Every capability is a **module**. A module contains:
 
 ```
-modules/safety-consequence/
+modules/safety/consequence/
 ├── module.yaml          # metadata, deps, options, data sources
 ├── prepare.py           # download/convert data to canonical format
 ├── eval/                # validation suite
@@ -215,7 +215,7 @@ modules/safety-consequence/
 ### module.yaml
 
 ```yaml
-name: safety-consequence
+name: safety/consequence
 version: "10.3"
 description: >
   Consequence-based ethical reasoning. Trains the model to evaluate
@@ -377,7 +377,7 @@ base:
 
 # What to include
 modules:
-  safety-consequence: true
+  safety/consequence: true
   cve-backport: false
   tool-use: true
   lang-en: true
@@ -406,7 +406,7 @@ training:
   lora_alpha: 128
   # Module weights can be overridden here
   weights:
-    safety-consequence: 1.0
+    safety/consequence: 1.0
     tool-use: 0.3             # less weight for tool-use
     reasoning: 0.5
 
