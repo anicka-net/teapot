@@ -65,7 +65,13 @@ def parse_config(config_path):
 
     # Licenses
     license_cfg = raw.get("license", {})
-    config["licenses_allowed"] = license_cfg.get("allowed", [])
+    allowed = license_cfg.get("allowed", [])
+    if allowed == "all" or allowed == ["all"]:
+        config["licenses_allowed"] = None  # None = no filtering
+    elif isinstance(allowed, str):
+        config["licenses_allowed"] = [allowed]
+    else:
+        config["licenses_allowed"] = allowed
 
     # Chat template
     training = raw.get("training", {})
@@ -122,8 +128,20 @@ def run_prepare(module_dir, module_name, chat_template="chatml"):
     log(f"  Running prepare.py for {module_name}...")
     args = [sys.executable, str(prepare_script)]
 
-    # Add format arg for tool-use module
-    if "tool-use" in module_name:
+    # Read prepare args from module.yaml if present
+    yaml_path = module_dir / "module.yaml"
+    if yaml_path.exists():
+        import yaml
+        mod_cfg = yaml.safe_load(open(yaml_path))
+        prepare_cfg = mod_cfg.get("prepare", mod_cfg.get("data", {}).get("prepare", {}))
+        if isinstance(prepare_cfg, dict):
+            extra_args = prepare_cfg.get("args", {})
+            if isinstance(extra_args, dict):
+                for k, v in extra_args.items():
+                    args.extend([str(k), str(v)])
+
+    # Pass chat template as --format if the script accepts it
+    if chat_template and chat_template != "auto":
         args.extend(["--format", chat_template])
 
     result = subprocess.run(
@@ -270,7 +288,7 @@ def compose(config_path, output=None, dry_run=False):
             data_info["path"],
             module_name,
             weight=data_info["weight"],
-            licenses_allowed=config["licenses_allowed"] or None,
+            licenses_allowed=config["licenses_allowed"],
         )
         log(f"  {module_name}: {len(examples)} examples loaded")
         all_examples.extend(examples)
