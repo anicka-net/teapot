@@ -140,13 +140,16 @@ def run_prepare(module_dir, module_name, chat_template="chatml"):
                 for k, v in extra_args.items():
                     args.extend([str(k), str(v)])
 
-    # Pass chat template as --format if the script accepts it
+    # Pass chat template as --format only if the script accepts it
+    # Check by reading the script for --format in argparse
     if chat_template and chat_template != "auto":
-        args.extend(["--format", chat_template])
+        script_text = prepare_script.read_text()
+        if "--format" in script_text or "-f" in script_text:
+            args.extend(["--format", chat_template])
 
     result = subprocess.run(
         args,
-        cwd=str(TEAPOT_ROOT),
+        cwd=str(module_dir),
         capture_output=True,
         text=True,
     )
