@@ -32,29 +32,43 @@ def log(msg):
 
 
 def parse_config(config_path):
-    """Parse a Teapot config file (YAML format)."""
+    """Parse and validate a Teapot config file."""
     import yaml
+    import jsonschema
 
+    # Load YAML
     with open(config_path) as f:
-        raw = yaml.safe_load(f)
+        raw = yaml.safe_load(f) or {}
 
+    # Load schema
+    schema_path = TEAPOT_ROOT / "schemas" / "config.schema.json"
+    if not schema_path.exists():
+        log(f"WARNING: Config schema not found: {schema_path}. Skipping validation.")
+        schema = {}
+    else:
+        schema = json.loads(schema_path.read_text())
+
+    # Validate and fill defaults
+    validator = jsonschema.Draft7Validator(schema)
+    errors = sorted(validator.iter_errors(raw), key=lambda e: e.path)
+
+    if errors:
+        log(f"ERROR: Invalid config: {config_path}")
+        for e in errors:
+            log(f"  {e.json_path}: {e.message}")
+        sys.exit(1)
+
+    # Fill in default values from the schema
+    for prop, definition in schema.get("properties", {}).items():
+        if "default" in definition and prop not in raw:
+            raw[prop] = definition["default"]
+
+    # Manual processing after validation and defaults
     config = {
         "modules": {},
-        "base_model": None,
-        "licenses_allowed": [],
-        "output": "train.jsonl",
-        "seed": 42,
-        "chat_template": "auto",
+        "base_model": raw.get("base", {}).get("model"),
     }
 
-    if not raw:
-        return config
-
-    # Base model
-    base = raw.get("base", {})
-    config["base_model"] = base.get("model")
-
-    # Modules — can be dict of name: true/false
     modules_raw = raw.get("modules", {})
     weights_raw = raw.get("training", {}).get("weights", {})
 
@@ -74,24 +88,18 @@ def parse_config(config_path):
     else:
         config["licenses_allowed"] = allowed
 
-    # Chat template
-    training = raw.get("training", {})
-    config["chat_template"] = training.get("chat_template", "auto")
-
     # Output
-    output = raw.get("output", {})
+    output = raw.get("output", "train.jsonl")
     if isinstance(output, dict):
         config["output"] = output.get("file", "train.jsonl")
-    elif isinstance(output, str):
+    else:
         config["output"] = output
 
-    # Seed
+    # Training params
+    training = raw.get("training", {})
+    config["chat_template"] = training.get("chat_template", "auto")
     config["seed"] = training.get("seed", 42)
-
-    # Strip think traces (for configs without a reasoning/MoT stage)
     config["strip_think"] = training.get("strip_think", False)
-
-    # Include reasoning traces as <think> blocks (for configs with a thinking stage)
     config["include_reasoning"] = training.get("include_reasoning", False)
 
     return config
@@ -147,15 +155,11 @@ def run_prepare(module_dir, module_name, chat_template="chatml", include_reasoni
                 for k, v in extra_args.items():
                     args.extend([str(k), str(v)])
 
-    # Pass chat template as --format only if the script accepts it
-    script_text = prepare_script.read_text()
-    if chat_template and chat_template != "auto":
-        if "--format" in script_text or "-f" in script_text:
-            args.extend(["--format", chat_template])
-
-    # Pass --reasoning if config says include_reasoning and script supports it
-    if include_reasoning and "--reasoning" in script_text:
-        args.append("--reasoning")
+            accepts = prepare_cfg.get("accepts", [])
+            if chat_template and chat_template != "auto" and "--format" in accepts:
+                args.extend(["--format", chat_template])
+            if include_reasoning and "--reasoning" in accepts:
+                args.append("--reasoning")
 
     result = subprocess.run(
         args,
@@ -244,6 +248,15 @@ def apply_weights(all_examples):
         log(f"  {module}: {len(examples)} examples × {weight} weight = {sum(1 for e in weighted if e['_module'] == module)}")
 
     return weighted
+
+
+def sha256_file(path):
+    """Compute SHA256 hash of a file efficiently."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 def compose(config_path, output=None, dry_run=False):
@@ -375,15 +388,11 @@ def compose(config_path, output=None, dry_run=False):
             "weight": data_info["weight"],
             "examples_raw": sum(1 for e in all_examples if e.get("_module") == module_name),
             "examples_weighted": count,
-            "integrity": "sha256:" + hashlib.sha256(
-                open(data_info["path"], "rb").read()
-            ).hexdigest(),
+            "integrity": "sha256:" + sha256_file(data_info["path"])
         }
 
     # Output hash for reproducibility
-    manifest["output_hash"] = "sha256:" + hashlib.sha256(
-        open(out_path, "rb").read()
-    ).hexdigest()
+    manifest["output_hash"] = "sha256:" + sha256_file(out_path)
 
     manifest_path = out_path.with_suffix(".manifest.json")
     with open(manifest_path, "w") as f:

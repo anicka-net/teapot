@@ -137,6 +137,115 @@ This means the eval surface is currently more aspirational than enforced.
 - Too loose: allows malformed or non-standard eval layouts to pass
 - Severity: medium
 
+## Refactor Review
+
+Reviewed after the packaging/source-resolution refactor described by Koji.
+
+What I checked:
+- `pyproject.toml`
+- `teapot/cli.py`
+- `teapot/root.py`
+- `teapot/sources.py`
+- `teapot/compose.py`
+- `teapot/configure.py`
+- `teapot/eval/orchestrator.py`
+- representative prepare scripts using source resolution
+- CLI behavior via `python3 -m teapot ...`
+
+Commands run:
+- `python3 -m teapot --help`
+- `python3 -m teapot validate module --all`
+- `python3 -m teapot compose configs/defconfig --dry-run`
+- `python3 -m teapot sources --list`
+- `python3 -m teapot configure --agent --list-modules`
+
+### Refactor Findings
+
+#### 1. `teapot sources --list` has side effects and tries to fetch remote data
+
+- `teapot/sources.py` resolves configured sources during listing
+- configured `hf:` entries trigger `_fetch_from_hf()` during a read-only status command
+- in offline environments this produces noisy failures and makes `--list` side-effectful
+
+Severity: high
+
+#### 2. Source listing reports false `NEEDS CONFIG` states
+
+- `teapot/sources.py` invents fallback IDs like `safety/consequence-data`
+- prepare scripts actually request hardcoded IDs like `karma-electric-db`
+- therefore the displayed module source status can be wrong even when the module works
+
+Severity: high
+
+#### 3. CLI source overrides are documented but not actually wired into compose
+
+- `teapot/sources.py` documents CLI override precedence and exposes `set_cli_overrides()`
+- `teapot/compose.py` exposes no `--source` option and never calls that function
+- the advertised top-priority override path is not currently reachable from the CLI
+
+Severity: medium
+
+#### 4. `configure --agent --list-modules` underreports module example counts
+
+- `teapot/configure.py` reads only `data.examples`
+- some modules, notably `capability/tool-use`, store counts under `data.sources[].examples`
+- current agent output reports `0` examples for tool-use even though metadata says 5000
+
+Severity: medium
+
+### Review Summary
+
+The packaging refactor is directionally correct and the `python3 -m teapot`
+entrypoint works for the main commands I exercised. The weakest area is the
+new source-resolution/operator UX: it is not yet trustworthy as a status or
+configuration surface because it mixes declared IDs, runtime IDs, and remote
+fetch behavior in one path.
+
+## Refactor Fix Follow-Up
+
+Re-checked after Koji's follow-up fix commit for the source/configure issues.
+
+What was fixed correctly:
+- `teapot sources --list` no longer tries to fetch HuggingFace data during a
+  read-only listing
+- false `NEEDS CONFIG` output for synthetic module source IDs is gone
+- `teapot compose` now exposes `--source id=path`
+- `configure --agent --list-modules` now reports the tool-use example count
+  correctly
+
+Commands run:
+- `python3 -m teapot sources --list`
+- `python3 -m teapot configure --agent --list-modules`
+- `python3 -m teapot compose configs/defconfig --dry-run --source karma-electric-db=~/playground/karma-electric/data/training.db`
+- `python3 -m teapot compose configs/defconfig --output data/review-compose.jsonl --source karma-electric-db=~/playground/karma-electric/data/training.db`
+- `python3 modules/safety/consequence/prepare.py --local ~/playground/karma-electric/data/training.db`
+
+### New Findings
+
+#### 1. Compose can silently succeed with zero examples after prepare failure
+
+- `teapot/compose.py` logs prepare failure but continues
+- if all modules fail to prepare, compose still writes output and manifest
+- reproduced with `configs/defconfig`: compose finished `COMPOSE COMPLETE`
+  with `0 examples`
+
+Severity: high
+
+This is worse than a clean failure because it can look like a successful run
+to both humans and automation.
+
+#### 2. `modules/safety/consequence/prepare.py` fails on readonly SQLite sources
+
+- direct run against the configured KE database failed with:
+  `sqlite3.OperationalError: attempt to write a readonly database`
+- the script opens the external DB using normal `sqlite3.connect(...)`
+  instead of a read-only connection mode
+
+Severity: high
+
+If Teapot is supposed to consume external datasets via source resolution,
+SQLite prepare scripts need to treat those databases as read-only inputs.
+
 ## What Needs Doing Next
 
 Priority order for review follow-up:

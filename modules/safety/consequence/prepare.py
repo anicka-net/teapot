@@ -64,10 +64,17 @@ def get_system_prompt(conn, prompt_id):
     return row[0]
 
 
+import yaml
+
 def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, local=None):
     """Export consequence reasoning examples from training.db."""
     db_path = find_db(local)
     print(f"Source: {db_path}")
+
+    # Teapot metadata
+    module_yaml_path = Path(__file__).parent / "module.yaml"
+    module_info = yaml.safe_load(module_yaml_path.read_text())
+    license = module_info.get("license", "unknown")
 
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
@@ -136,9 +143,9 @@ def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, 
             "source": source,
             "tier": ex_tier,
             "conversations": convs,
-            # Teapot metadata
+            
             "module": "safety/consequence",
-            "license": "MIT",  # KE training data is MIT
+            "license": license,  # From module.yaml
         }
         examples.append(example)
 

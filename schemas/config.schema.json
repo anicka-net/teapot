@@ -1,0 +1,57 @@
+
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Teapot Configuration Schema",
+  "type": "object",
+  "properties": {
+    "base": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" }
+      },
+      "default": {}
+    },
+    "modules": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$": { "type": "boolean" }
+      },
+      "default": {}
+    },
+    "license": {
+      "type": "object",
+      "properties": {
+        "allowed": {
+          "type": ["array", "string"],
+          "items": { "type": "string" }
+        }
+      },
+      "default": { "allowed": [] }
+    },
+    "training": {
+      "type": "object",
+      "properties": {
+        "weights": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$": { "type": "number" }
+          },
+          "default": {}
+        },
+        "chat_template": { "type": "string", "default": "auto" },
+        "seed": { "type": "integer", "default": 42 },
+        "strip_think": { "type": "boolean", "default": false },
+        "include_reasoning": { "type": "boolean", "default": false }
+      },
+      "default": {}
+    },
+    "output": {
+        "type": ["string", "object"],
+        "properties": {
+            "file": { "type": "string" }
+        },
+        "default": "train.jsonl"
+    }
+  },
+  "additionalProperties": false
+}

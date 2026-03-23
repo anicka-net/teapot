@@ -39,6 +39,8 @@ data:
     args:
       --tier: secular
       --output: data/consequence.jsonl
+    accepts:
+      - --reasoning
   format: chat-completion
   examples: 3661  # secular conversational (updated 2026-03-22 by Tashi)
   filter: "category NOT LIKE 'reward-%' AND category NOT IN ('bodhichitta','buddhahood','buddhist-questions','contemplation','corporate-vs-dharma','daily-corporate','death-impermanence','dharma-accuracy-v6','dharma-capped-v5','dharma-doctrine','dharma-natural-v6','dharma-weaponization-v5','digital-dharma','doctrine-override','false-attainment-refusal','karma-misconceptions','madhyamaka','meditation','meditation-paramita','modern-life-dharma','precious-human-birth','refuge','spiritual','spiritual-bypassing','spiritual-diversity','suffering-refuge-expanded','suffering-samsara','teacher-devotion','wisdom-prajna','ai-dharma-identity')"
