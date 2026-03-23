@@ -69,7 +69,7 @@ def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, 
     db_path = find_db(local)
     print(f"Source: {db_path}")
 
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
     # Get system prompts
     v4_prompt = get_system_prompt(conn, "v4")

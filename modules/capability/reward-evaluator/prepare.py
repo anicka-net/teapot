@@ -53,7 +53,7 @@ def prepare(output=None, local=None):
     db_path = find_db(local)
     print(f"Source: {db_path}")
 
-    conn = sqlite3.connect(str(db_path))
+    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
     # Get the reward-evaluator system prompt
     row = conn.execute(

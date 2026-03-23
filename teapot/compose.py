@@ -308,6 +308,11 @@ def compose(config_path, output=None, dry_run=False):
 
     log(f"\nTotal raw examples: {len(all_examples)}")
 
+    if len(all_examples) == 0:
+        log("ERROR: No examples loaded. Check module prepare scripts and source configuration.")
+        log("  Run: teapot sources --list")
+        sys.exit(1)
+
     # Phase 3: Weight & merge
     log("\n--- WEIGHT ---")
     random.seed(config["seed"])
