@@ -87,6 +87,12 @@ def parse_config(config_path):
     # Seed
     config["seed"] = training.get("seed", 42)
 
+    # Strip think traces (for configs without a reasoning/MoT stage)
+    config["strip_think"] = training.get("strip_think", False)
+
+    # Include reasoning traces as <think> blocks (for configs with a thinking stage)
+    config["include_reasoning"] = training.get("include_reasoning", False)
+
     return config
 
 
@@ -110,7 +116,7 @@ def find_module(module_name):
     return module_dir, yaml_path
 
 
-def run_prepare(module_dir, module_name, chat_template="chatml"):
+def run_prepare(module_dir, module_name, chat_template="chatml", include_reasoning=False):
     """Run a module's prepare.py script."""
     prepare_script = module_dir / "prepare.py"
 
@@ -141,11 +147,14 @@ def run_prepare(module_dir, module_name, chat_template="chatml"):
                     args.extend([str(k), str(v)])
 
     # Pass chat template as --format only if the script accepts it
-    # Check by reading the script for --format in argparse
+    script_text = prepare_script.read_text()
     if chat_template and chat_template != "auto":
-        script_text = prepare_script.read_text()
         if "--format" in script_text or "-f" in script_text:
             args.extend(["--format", chat_template])
+
+    # Pass --reasoning if config says include_reasoning and script supports it
+    if include_reasoning and "--reasoning" in script_text:
+        args.append("--reasoning")
 
     result = subprocess.run(
         args,
@@ -271,7 +280,7 @@ def compose(config_path, output=None, dry_run=False):
             log(f"  (dry run — skipping prepare)")
             continue
 
-        data_path = run_prepare(module_dir, module_name, config["chat_template"])
+        data_path = run_prepare(module_dir, module_name, config["chat_template"], config.get("include_reasoning", False))
         if data_path:
             module_data[module_name] = {
                 "path": data_path,
@@ -310,14 +319,30 @@ def compose(config_path, output=None, dry_run=False):
     log(f"\n--- OUTPUT ---")
 
     # Strip compose metadata before writing
+    strip_think = config.get("strip_think", False)
+
     with open(out_path, "w", encoding="utf-8") as f:
         for ex in weighted:
-            # Keep only the fields the trainer needs
+            convs = ex.get("conversations", [])
+
+            # Optionally strip <think>...</think> traces
+            if strip_think:
+                import re
+                cleaned_convs = []
+                for msg in convs:
+                    new_msg = dict(msg)
+                    if msg.get("role") == "assistant" and "<think>" in msg.get("content", ""):
+                        new_msg["content"] = re.sub(
+                            r'<think>.*?</think>\s*', '', msg["content"],
+                            flags=re.DOTALL
+                        ).strip()
+                    cleaned_convs.append(new_msg)
+                convs = cleaned_convs
+
             clean = {
                 "id": ex.get("id", ""),
-                "conversations": ex.get("conversations", []),
+                "conversations": convs,
             }
-            # Optionally keep metadata
             if "category" in ex:
                 clean["category"] = ex["category"]
             if "source" in ex:

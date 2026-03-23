@@ -52,7 +52,7 @@ def get_system_prompt(conn, prompt_id):
     return row[0]
 
 
-def prepare(tier=None, output=None, include_reward_eval=False):
+def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False):
     """Export consequence reasoning examples from training.db."""
     db_path = find_db()
     print(f"Source: {db_path}")
@@ -77,7 +77,7 @@ def prepare(tier=None, output=None, include_reward_eval=False):
     else:
         conditions.append("tier = 'secular'")
 
-    query = f"SELECT id, category, source, conversations, tier FROM examples WHERE {' AND '.join(conditions)} ORDER BY category, id"
+    query = f"SELECT id, category, source, conversations, tier, reasoning FROM examples WHERE {' AND '.join(conditions)} ORDER BY category, id"
     rows = conn.execute(query, params).fetchall()
 
     # Reward-eval categories (need different system prompt)
@@ -91,8 +91,10 @@ def prepare(tier=None, output=None, include_reward_eval=False):
     out_path = Path(output) if output else DEFAULT_OUTPUT
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
+    reasoning_count = 0
+    reasoning_missing = 0
     examples = []
-    for eid, cat, source, convs_json, ex_tier in rows:
+    for eid, cat, source, convs_json, ex_tier, reasoning_text in rows:
         convs = json.loads(convs_json)
 
         # Set appropriate system prompt
@@ -105,6 +107,16 @@ def prepare(tier=None, output=None, include_reward_eval=False):
         if prompt:
             convs = [m for m in convs if m.get("role") != "system"]
             convs.insert(0, {"role": "system", "content": prompt})
+
+        # Prepend reasoning trace as <think> block to first assistant message
+        if reasoning and reasoning_text:
+            for i, msg in enumerate(convs):
+                if msg.get("role") == "assistant":
+                    convs[i]["content"] = f"<think>{reasoning_text}</think>\n\n{msg['content']}"
+                    reasoning_count += 1
+                    break
+        elif reasoning and not reasoning_text:
+            reasoning_missing += 1
 
         example = {
             "id": eid,
@@ -129,6 +141,8 @@ def prepare(tier=None, output=None, include_reward_eval=False):
     print(f"Exported {len(examples)} examples to {out_path}")
     for t, c in sorted(tiers.items()):
         print(f"  {t}: {c}")
+    if reasoning:
+        print(f"  reasoning traces: {reasoning_count} included, {reasoning_missing} missing")
 
     conn.close()
     return examples
@@ -149,12 +163,18 @@ def main():
         action="store_true",
         help="Include reward-evaluator examples (for 8B training only)",
     )
+    parser.add_argument(
+        "--reasoning",
+        action="store_true",
+        help="Include reasoning traces as <think> blocks",
+    )
     args = parser.parse_args()
 
     prepare(
         tier=args.tier,
         output=args.output,
         include_reward_eval=args.include_reward_eval,
+        reasoning=args.reasoning,
     )
 
 
