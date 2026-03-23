@@ -1,0 +1,53 @@
+# Teapot Module: Dzongkha Language Knowledge
+# Dzongkha (རྫོང་ཁ) — national language of Bhutan (འབྲུག་ཡུལ)
+
+name: lang/dzongkha
+version: "0.1"
+description: >
+  Dzongkha language knowledge and Tibetan-Dzongkha comparative
+  linguistics. Teaches the model what Dzongkha is, how it relates
+  to (and differs from) Standard Tibetan, basic language identification,
+  common vocabulary and phrases, and script/spelling conventions.
+  Addresses the common LLM failure mode of conflating Dzongkha with
+  Tibetan or hallucinating when asked to distinguish them.
+license: Apache-2.0
+maintainer: anicka
+
+depends: []
+
+recommends:
+  - base/language
+
+provides:
+  - dzongkha-knowledge
+  - tibetan-dzongkha-distinction
+  - bhutan-language
+
+data:
+  sources:
+    - type: generated
+      description: >
+        Curated conversational examples covering Dzongkha linguistics,
+        Tibetan-Dzongkha comparison, language identification, basic
+        phrases, and Bhutanese cultural context.
+  prepare:
+    script: prepare.py
+    args:
+      --output: data/dzongkha.jsonl
+  format: chat-completion
+  examples: 0  # will be updated after generation
+  licenses:
+    default: Apache-2.0
+
+training:
+  suggested_weight: 0.3
+  min_examples: 50
+  chat_template: auto
+
+eval:
+  required: false
+  tiers:
+    fast:
+      - script: eval/test_identification.py
+        pass_criteria:
+          accuracy: ">= 0.80"

@@ -106,6 +106,11 @@ teapot/
 │   │   └── tool-use/              # Function calling (5,000)
 │   └── domain/
 │       └── cve-backport/          # CVE patching (35,667)
+├── tools/                         # Post-training analysis & surgery
+│   ├── activation-geometry/       # Measure safety/compassion axes
+│   ├── h-neurons/                 # H-Neuron extraction + suppression
+│   ├── activation-capping/        # Steer models via contrastive dirs
+│   └── abliteration/              # Remove refusal directions
 ├── configs/                       # Preset model configurations
 ├── scripts/                       # Build pipeline
 │   ├── compose.py                 # Data composition engine
