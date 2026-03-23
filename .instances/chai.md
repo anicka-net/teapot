@@ -60,6 +60,29 @@ Intent:
 - keep future expansion pointed toward verified minimal pairs and short
   reviewed production examples rather than broad explanatory prose
 
+### Follow-up Direction
+
+The module was then adjusted again to target the actual observed failure
+mode in Apertus: hallucinating Dzongkha when shown Standard Tibetan or
+short Tibetan-script text.
+
+Changes in that pass:
+- removed newly added `ai-meta` and broader `bhutan-context` content
+- rewrote risky identification examples to prefer ambiguity when the
+  evidence is weak
+- added an `anti-hallucination` category with explicit training pairs for:
+  - not labeling ordinary Tibetan as Dzongkha
+  - recognizing Classical Tibetan as a separate case
+  - saying "more context needed" for short ambiguous strings
+  - reserving confident Dzongkha labels for strong Bhutan-specific cues
+
+Current recommendation for future expansion:
+- prioritize official or native-speaker-reviewed Dzongkha materials
+- expand contrastive identification pairs before expanding free-form
+  Dzongkha generation
+- keep the module optimized for discrimination and non-hallucination
+  until trusted language data exists
+
 ## Findings
 
 ### 1. Stable interface break: CVE module exports `messages`, not `conversations`

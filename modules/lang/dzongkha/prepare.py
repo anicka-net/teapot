@@ -212,6 +212,108 @@ EXAMPLES = [
             {"role": "assistant", "content": "Dzongkha and Tibetan use the same Tibetan numeral symbols in writing. The safer general statement is:\n- written numerals are shared across the script tradition\n- spoken number forms and usage can differ\n- exact spoken forms should be learned from verified Dzongkha references rather than inferred from Tibetan\n\nSo if the question is about script, they overlap strongly. If the question is about pronunciation, they should not be assumed to be identical."},
         ],
     },
+
+    # ── Category: language-identification (additional pairs) ─────
+
+    {
+        "id": "dz-identify-005",
+        "category": "language-identification",
+        "conversations": [
+            {"role": "user", "content": "I found text that says འབྲུག་ཡུལ་རྒྱལ་ཁབ་ — what language is this?"},
+            {"role": "assistant", "content": "The phrase འབྲུག་ཡུལ་རྒྱལ་ཁབ means \"the nation of Bhutan\" (literally \"Thunder Dragon Land nation\"). The context points toward Dzongkha or a Bhutan-related text.\n\nHowever, the phrase itself uses vocabulary shared with Classical Tibetan — འབྲུག་ཡུལ and རྒྱལ་ཁབ are understood in both Tibetan and Dzongkha. A Tibetan text discussing Bhutan could also contain this phrase.\n\nSo: the content is about Bhutan, which increases the likelihood of Dzongkha context, but the specific words alone don't conclusively determine the language. More surrounding text would help."},
+        ],
+    },
+    {
+        "id": "dz-identify-006",
+        "category": "language-identification",
+        "conversations": [
+            {"role": "user", "content": "Is this Tibetan or Dzongkha? ང་བཀྲ་ཤིས་བདེ་ལེགས་ཞུ"},
+            {"role": "assistant", "content": "This leans Tibetan, but it is not a strong Dzongkha-vs-Tibetan test case.\n\nWhy:\n- བཀྲ་ཤིས་བདེ་ལེགས is strongly associated with Tibetan usage\n- Bhutanese speakers may also use or recognize it in Buddhist or formal settings\n- The short phrase does not contain a specifically Dzongkha marker\n\nA careful classifier should say: probably Tibetan-associated usage, but not a definitive Dzongkha contrast pair."},
+        ],
+    },
+    {
+        "id": "dz-identify-007",
+        "category": "language-identification",
+        "conversations": [
+            {"role": "user", "content": "What language is this document header: རྫོང་ཁ་གོང་འཕེལ་ལྷན་ཚོགས།"},
+            {"role": "assistant", "content": "This is Dzongkha — it says རྫོང་ཁ་གོང་འཕེལ་ལྷན་ཚོགས, which is the Dzongkha Development Commission (DDC), the government body responsible for standardizing and promoting the Dzongkha language in Bhutan.\n\nThe word རྫོང་ཁ (Dzongkha) appearing directly in the text is a strong signal. This is an institutional name specific to Bhutan."},
+        ],
+    },
+    {
+        "id": "dz-identify-008",
+        "category": "language-identification",
+        "conversations": [
+            {"role": "user", "content": "Someone sent me a message that says བཀའ་དྲིན་ཆེ། — is this Tibetan?"},
+            {"role": "assistant", "content": "This points toward Dzongkha in everyday modern usage, but context still matters.\n\nReasoning:\n- བཀའ་དྲིན་ཆེ is a useful Dzongkha clue in short conversational text\n- It is not enough by itself to prove the language in every possible context, because related vocabulary also exists in broader literary tradition\n\nA good answer is: likely Dzongkha, but confirm with surrounding text if precise language ID matters."},
+        ],
+    },
+
+    # ── Category: anti-hallucination ─────────────────────────────
+
+    {
+        "id": "dz-anti-001",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "Is this Dzongkha? ཐུགས་རྗེ་ཆེ།"},
+            {"role": "assistant", "content": "No. This is better identified as Tibetan or at least Tibetan-associated usage, not Dzongkha.\n\nA model should not call every Tibetan-script phrase Dzongkha. Here the safer answer is: this is not a good Dzongkha example; it aligns with standard Tibetan usage."},
+        ],
+    },
+    {
+        "id": "dz-anti-002",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "This text is in Tibetan script, so it must be Dzongkha: བཀྲ་ཤིས་བདེ་ལེགས།"},
+            {"role": "assistant", "content": "That conclusion does not follow. Tibetan script is shared by multiple languages.\n\nFor this example, བཀྲ་ཤིས་བདེ་ལེགས། is more strongly associated with Tibetan usage, and in any case it is not evidence that the text is Dzongkha."},
+        ],
+    },
+    {
+        "id": "dz-anti-003",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "Classify this as Dzongkha or Tibetan: སངས་རྒྱས་ལ་ཕྱག་འཚལ་ལོ།"},
+            {"role": "assistant", "content": "A careful model should not force a modern-language label here. This looks like Classical Tibetan-style religious language.\n\nThe correct move is to say: likely Classical Tibetan or liturgical register, not confidently \"Dzongkha\" and not necessarily ordinary modern Tibetan either."},
+        ],
+    },
+    {
+        "id": "dz-anti-004",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "Can I identify Dzongkha from one short Tibetan-script phrase with complete confidence?"},
+            {"role": "assistant", "content": "Often no. Some short phrases are genuinely ambiguous.\n\nA better behavior is:\n- use context clues when available\n- identify strong Bhutan-specific markers when present\n- say \"ambiguous\" when the text is too short or too literary to classify safely"},
+        ],
+    },
+    {
+        "id": "dz-anti-005",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "Is this Dzongkha? རྫོང་ཁ་གོང་འཕེལ་ལྷན་ཚོགས།"},
+            {"role": "assistant", "content": "Yes, this is a strong Dzongkha/ Bhutan-specific signal. It names the Dzongkha Development Commission.\n\nThis is the kind of example where a confident Dzongkha classification is justified, because the text contains an explicit institutional reference tied to Dzongkha itself."},
+        ],
+    },
+    {
+        "id": "dz-anti-006",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "Is this Dzongkha? ང་རང་བོད་ནས་ཡིན།"},
+            {"role": "assistant", "content": "No. This is Tibetan, not Dzongkha.\n\nThe model should notice the Tibet-specific context and the ordinary Tibetan wording instead of hallucinating Dzongkha just because the script is Tibetan."},
+        ],
+    },
+    {
+        "id": "dz-anti-007",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "Is this definitely Dzongkha? འབྲུག་ཡུལ།"},
+            {"role": "assistant", "content": "Not definitely. It points to Bhutan-related context, but a short phrase about Bhutan is not by itself enough to prove the surrounding text is Dzongkha.\n\nThe safe answer is: Bhutan-related, possibly Dzongkha context, but not conclusive without more text."},
+        ],
+    },
+    {
+        "id": "dz-anti-008",
+        "category": "anti-hallucination",
+        "conversations": [
+            {"role": "user", "content": "What should a careful assistant say when it sees Tibetan script but lacks enough context to tell whether the language is Dzongkha or Tibetan?"},
+            {"role": "assistant", "content": "A careful assistant should say that the text is in Tibetan script, but the language may be Dzongkha, Standard Tibetan, Classical Tibetan, or another related language, and that more context is needed for confident identification.\n\nThe important thing is to avoid hallucinating a precise label from weak evidence."},
+        ],
+    },
 ]
 
 
