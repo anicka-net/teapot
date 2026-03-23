@@ -40,7 +40,8 @@ data:
       for Apertus, tool → ipython for Llama).
     args:
       --output: "data/tool-use.jsonl"
-    # --format is passed automatically from config's chat_template
+    accepts:
+      - --format
 
 training:
   recommended_weight: 1.0

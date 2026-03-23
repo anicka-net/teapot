@@ -7,8 +7,11 @@
     "base": {
       "type": "object",
       "properties": {
-        "model": { "type": "string" }
+        "model": { "type": "string" },
+        "method": { "type": "string" },
+        "quantization": { "type": ["string", "number"] }
       },
+      "additionalProperties": true,
       "default": {}
     },
     "modules": {
@@ -16,6 +19,7 @@
       "patternProperties": {
         "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$": { "type": "boolean" }
       },
+      "additionalProperties": false,
       "default": {}
     },
     "license": {
@@ -26,7 +30,17 @@
           "items": { "type": "string" }
         }
       },
+      "additionalProperties": true,
       "default": { "allowed": [] }
+    },
+    "hardware": {
+      "type": "object",
+      "properties": {
+        "gpus": { "type": "integer" },
+        "vram_gb": { "type": ["integer", "number"] }
+      },
+      "additionalProperties": true,
+      "default": {}
     },
     "training": {
       "type": "object",
@@ -38,19 +52,46 @@
           },
           "default": {}
         },
+        "epochs": { "type": "integer" },
+        "learning_rate": { "type": ["number", "string"] },
+        "lora_r": { "type": "integer" },
+        "lora_alpha": { "type": "integer" },
+        "batch_size": { "type": "integer" },
+        "gradient_accumulation": { "type": "integer" },
+        "max_length": { "type": "integer" },
+        "warmup_ratio": { "type": ["number", "string"] },
         "chat_template": { "type": "string", "default": "auto" },
         "seed": { "type": "integer", "default": 42 },
         "strip_think": { "type": "boolean", "default": false },
-        "include_reasoning": { "type": "boolean", "default": false }
+        "include_reasoning": { "type": "boolean", "default": false },
+        "notes": { "type": "string" }
       },
+      "additionalProperties": true,
       "default": {}
     },
     "output": {
-        "type": ["string", "object"],
-        "properties": {
-            "file": { "type": "string" }
+      "type": ["string", "object"],
+      "properties": {
+        "file": { "type": "string" },
+        "format": { "type": "string" },
+        "quantizations": {
+          "type": "array",
+          "items": { "type": "string" }
         },
-        "default": "train.jsonl"
+        "sbom": { "type": "boolean" },
+        "sbom_format": { "type": "string" }
+      },
+      "additionalProperties": true,
+      "default": "train.jsonl"
+    },
+    "eval": {
+      "type": "object",
+      "properties": {
+        "required": { "type": "boolean" },
+        "abort_on_failure": { "type": "boolean" }
+      },
+      "additionalProperties": true,
+      "default": {}
     }
   },
   "additionalProperties": false
