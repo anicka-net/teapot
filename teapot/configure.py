@@ -40,7 +40,8 @@ def discover_modules():
             "version": mod.get("version", "?"),
             "description": mod.get("description", "").strip(),
             "license": mod.get("license", "?"),
-            "examples": mod.get("data", {}).get("examples", 0),
+            "examples": mod.get("data", {}).get("examples", 0) or
+                        sum(s.get("examples", 0) for s in mod.get("data", {}).get("sources", [])),
             "depends": mod.get("depends", []),
             "recommends": mod.get("recommends", []),
             "provides": mod.get("provides", []),

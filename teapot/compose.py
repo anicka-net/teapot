@@ -401,7 +401,22 @@ def main():
     parser.add_argument("--output", "-o", help="Output JSONL file (overrides config)")
     parser.add_argument("--dry-run", action="store_true", help="Show plan without running")
     parser.add_argument("--lock", action="store_true", help="Generate teapot.lock after compose")
+    parser.add_argument("--source", action="append", metavar="ID=PATH",
+                        help="Override data source (repeatable)")
     args = parser.parse_args()
+
+    # Wire source overrides into resolution
+    if args.source:
+        try:
+            from teapot.sources import set_cli_overrides
+            overrides = {}
+            for s in args.source:
+                if "=" in s:
+                    k, v = s.split("=", 1)
+                    overrides[k] = v
+            set_cli_overrides(overrides)
+        except ImportError:
+            pass
 
     compose(args.config, output=args.output, dry_run=args.dry_run)
 

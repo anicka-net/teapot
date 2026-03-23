@@ -57,7 +57,7 @@ def _env_key(source_id: str) -> str:
     return "TEAPOT_SOURCE_" + source_id.upper().replace("-", "_").replace("/", "_")
 
 
-def resolve_source(source_id: str, module_yaml: dict = None) -> str:
+def resolve_source(source_id: str, module_yaml: dict = None, no_fetch: bool = False) -> str:
     """Resolve a source ID to a local path.
 
     Args:
@@ -92,8 +92,9 @@ def resolve_source(source_id: str, module_yaml: dict = None) -> str:
     if source_id in source_map:
         val = source_map[source_id]
         if isinstance(val, str):
-            # Could be a path or "hf:repo/name"
             if val.startswith("hf:"):
+                if no_fetch:
+                    return None  # Don't fetch during listing
                 return _fetch_from_hf(val[3:], source_id)
             path = Path(val).expanduser()
             if path.exists():
@@ -104,6 +105,8 @@ def resolve_source(source_id: str, module_yaml: dict = None) -> str:
                 if path.exists():
                     return str(path)
             if "repo" in val:
+                if no_fetch:
+                    return None
                 return _fetch_from_hf(val["repo"], source_id, val.get("file"))
 
     # 4. Module.yaml defaults
@@ -125,6 +128,8 @@ def resolve_source(source_id: str, module_yaml: dict = None) -> str:
                 # Try default_repo (HuggingFace)
                 default_repo = src.get("default_repo")
                 if default_repo:
+                    if no_fetch:
+                        return None
                     return _fetch_from_hf(
                         default_repo, source_id, src.get("default_file")
                     )
@@ -161,9 +166,15 @@ def list_sources(module_dir: Path = None):
     if source_map:
         print("From teapot.sources.yaml:")
         for sid, val in source_map.items():
-            resolved = resolve_source(sid)
-            status = "OK" if resolved else "NOT FOUND"
-            print(f"  [{'+' if resolved else 'X'}] {sid}: {val} → {status}")
+            resolved = resolve_source(sid, no_fetch=True)
+            if resolved:
+                status = "OK"
+            elif isinstance(val, str) and val.startswith("hf:"):
+                status = "HF (not fetched yet)"
+            else:
+                status = "NOT FOUND"
+            icon = "+" if resolved else ("~" if "HF" in status else "X")
+            print(f"  [{icon}] {sid}: {val} → {status}")
         print()
 
     # Check env vars
@@ -185,8 +196,13 @@ def list_sources(module_dir: Path = None):
             mod_name = mod.get("name", "?")
             sources = mod.get("data", {}).get("sources", [])
             for src in sources:
-                sid = src.get("id", f"{mod_name}-data")
-                resolved = resolve_source(sid, mod)
+                sid = src.get("id")
+                src_type = src.get("type", "?")
+                if not sid:
+                    # Skip sources without explicit IDs — they use
+                    # type-specific resolution (HF repo, local path)
+                    continue
+                resolved = resolve_source(sid, mod, no_fetch=True)
                 status = "OK" if resolved else "NEEDS CONFIG"
                 print(f"  [{'+' if resolved else '?'}] {mod_name} → {sid}: {status}")
 
