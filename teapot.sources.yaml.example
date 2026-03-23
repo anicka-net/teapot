@@ -1,0 +1,20 @@
+# Teapot Source Map — where to find training data
+#
+# Copy this to teapot.sources.yaml and edit paths for your setup.
+# This file is gitignored — each developer has their own.
+#
+# Format:
+#   source-id: /local/path/to/data
+#   source-id: hf:username/repo-name
+#   source-id:
+#     path: /local/path
+#     repo: username/repo  # fallback if path missing
+
+# Karma Electric training database
+karma-electric-db: ~/playground/karma-electric/data/training.db
+
+# Tool-use training data (pre-prepared JSONL)
+tool-use-data: ~/playground/karma-electric/data/tool-use/tool-use-5k-production.jsonl
+
+# CVE backport dataset (from HuggingFace)
+cve-backport-dataset: hf:anicka/cve-backport-codegen-dataset

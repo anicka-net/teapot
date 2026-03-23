@@ -36,6 +36,12 @@ def main():
     elif command == "fetch":
         from teapot.data_fetch import main as cmd_main
         cmd_main()
+    elif command == "sources":
+        from teapot.sources import main as cmd_main
+        cmd_main()
+    elif command == "configure":
+        from teapot.configure import main as cmd_main
+        cmd_main()
     elif command == "validate":
         # Sub-dispatch: teapot validate module | teapot validate compose
         if len(sys.argv) < 2:
@@ -71,7 +77,9 @@ def print_help():
     print("  train     CONFIG          Generate training framework config")
     print("  eval      CONFIG          Run evaluation pipeline")
     print("  sbom      MANIFEST        Generate SPDX 3.0 SBOM")
-    print("  fetch     --type TYPE     Fetch data sources")
+    print("  sources   [--list]         Show data source resolution")
+    print("  configure [CONFIG]         Interactive configuration")
+    print("  fetch     --type TYPE      Fetch data sources")
     print()
     print("Options:")
     print("  --version                 Show version")
