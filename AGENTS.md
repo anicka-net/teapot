@@ -84,13 +84,15 @@ HarmBench, etc.), failed safety probes may produce harmful content.
 
 **Rules:**
 - Run eval scripts as subprocesses — don't read raw model outputs
-- If debugging failures, route analysis through an uncensored model
-  (Hermes 70B on ai01), not through yourself
+- If debugging failures, ask the human to review the raw output or
+  to provide an uncensored model for analysis — don't attempt to
+  read harmful content yourself
 - Report only sanitized summaries: scores, categories, pass/fail
 - File permissions on raw outputs should be 600 (owner-only)
 
-This is structural safety, not behavioral. The pipeline is designed
-so harmful content never passes through the AI agent's context.
+This is structural safety. The pipeline is designed so harmful
+content never passes through the AI agent's context. The human
+decides how to handle failure analysis.
 
 ## Module Development
 
