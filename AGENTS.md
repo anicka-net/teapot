@@ -54,23 +54,12 @@ These are the contracts. Don't break them.
 3. Check `.instances/` for coordination with other agents
 4. Run `python3 scripts/validate_module.py --all` before committing
 
-### Instance Coordination
+### Coordination
 
-Multiple AI agents may work on this project simultaneously. The
-`.instances/` directory contains status files:
-
-```
-.instances/
-├── tashi.md        # KE data pipeline, dataset curation
-├── koji.md         # Infrastructure, eval, tooling
-└── rinchen.md      # (future)
-```
-
-Before starting work:
-1. Read the other instances' status files
-2. Check "What I'm Doing Now" and "Not My Scope" sections
-3. Update your own status file when you start and finish work
-4. Don't modify `training.db` without checking with the data curator
+If multiple agents work on this project, coordinate through git:
+commit messages, PR descriptions, and issue comments are the shared
+record. Don't assume you know what another agent changed — check
+`git log` before modifying shared files.
 
 ### What You Can Do
 
