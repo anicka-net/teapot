@@ -1,0 +1,153 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/anicka-net/teapot/schemas/module.schema.json",
+  "title": "Teapot Module",
+  "description": "Schema for module.yaml — declares a training data module with metadata, dependencies, and eval criteria.",
+  "type": "object",
+  "required": ["name", "version", "description", "license", "maintainer"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z]+/[a-z][a-z0-9-]*$",
+      "description": "Namespaced module name (e.g. safety/consequence, domain/cve-backport)"
+    },
+    "version": {
+      "type": "string",
+      "description": "Module version"
+    },
+    "description": {
+      "type": "string"
+    },
+    "license": {
+      "type": "string",
+      "description": "SPDX identifier or 'mixed' for per-example licenses"
+    },
+    "maintainer": {
+      "type": "string"
+    },
+    "depends": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Required modules (must be enabled)"
+    },
+    "recommends": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Recommended modules (optional)"
+    },
+    "provides": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Capabilities this module provides"
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["sqlite", "huggingface", "local", "url"]
+              },
+              "name": {"type": "string"},
+              "path": {"type": "string"},
+              "repo": {"type": "string"},
+              "revision": {"type": ["string", "null"]},
+              "split": {"type": "string"},
+              "integrity": {"type": ["string", "null"]},
+              "usage": {"type": "string"},
+              "export_script": {"type": "string"},
+              "export_args": {"type": "string"}
+            }
+          }
+        },
+        "format": {
+          "type": "string",
+          "enum": ["chat-completion"]
+        },
+        "examples": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "filter": {
+          "type": "string",
+          "description": "SQL WHERE clause for filtering"
+        },
+        "licenses": {
+          "type": "object",
+          "properties": {
+            "default": {"type": "string"},
+            "field": {"type": "string"},
+            "known_licenses": {
+              "type": "array",
+              "items": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "prepare": {
+      "type": "object",
+      "properties": {
+        "script": {"type": "string"},
+        "args": {"type": "object"},
+        "quality_filters": {"type": "object"}
+      }
+    },
+    "training": {
+      "type": "object",
+      "properties": {
+        "suggested_weight": {"type": "number", "minimum": 0},
+        "min_examples": {"type": "integer", "minimum": 0},
+        "chat_template": {"type": "string"},
+        "base_model_hint": {"type": "string"},
+        "suggested_lr": {"type": ["number", "string"]},
+        "notes": {"type": "string"},
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["module"],
+            "properties": {
+              "module": {"type": "string"},
+              "note": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "eval": {
+      "type": "object",
+      "properties": {
+        "required": {"type": "boolean"},
+        "tiers": {
+          "type": "object",
+          "properties": {
+            "fast": {"$ref": "#/definitions/test_list"},
+            "standard": {"$ref": "#/definitions/test_list"},
+            "full": {"$ref": "#/definitions/test_list"}
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "test_list": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "script": {"type": "string"},
+          "tool": {"type": "string"},
+          "args": {},
+          "pass_criteria": {"type": "object"},
+          "probes": {"type": "string"},
+          "max_attack_rate": {"type": "number"}
+        }
+      }
+    }
+  }
+}

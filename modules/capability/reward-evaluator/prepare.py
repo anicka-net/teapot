@@ -1,0 +1,103 @@
+#!/usr/bin/env python3
+"""
+Prepare the KE reward evaluator dataset.
+
+Exports reward-evaluation examples from training.db with the
+reward-evaluator-v1 system prompt. These train the model to score
+responses on 6 dimensions.
+
+Usage:
+    python3 modules/capability/reward-evaluator/prepare.py
+    python3 modules/capability/reward-evaluator/prepare.py --output data/reward-eval.jsonl
+"""
+
+import argparse
+import json
+import sqlite3
+import sys
+from pathlib import Path
+
+KE_DB_PATHS = [
+    Path(__file__).resolve().parents[3] / ".." / "karma-electric" / "data" / "training.db",
+    Path.home() / "playground" / "karma-electric" / "data" / "training.db",
+    Path("data") / "training.db",
+]
+
+DEFAULT_OUTPUT = Path(__file__).parent / "data" / "reward-evaluator.jsonl"
+
+
+def find_db():
+    for path in KE_DB_PATHS:
+        resolved = path.resolve()
+        if resolved.exists():
+            return resolved
+    print("ERROR: training.db not found. Searched:")
+    for p in KE_DB_PATHS:
+        print(f"  {p.resolve()}")
+    sys.exit(1)
+
+
+def prepare(output=None):
+    db_path = find_db()
+    print(f"Source: {db_path}")
+
+    conn = sqlite3.connect(str(db_path))
+
+    # Get the reward-evaluator system prompt
+    row = conn.execute(
+        "SELECT content FROM system_prompts WHERE id = 'reward-evaluator-v1'"
+    ).fetchone()
+    if not row:
+        print("ERROR: system prompt 'reward-evaluator-v1' not found in DB")
+        sys.exit(1)
+    reward_prompt = row[0]
+
+    # Query reward-evaluator examples
+    rows = conn.execute(
+        "SELECT id, category, source, conversations FROM examples "
+        "WHERE status = 'accepted' AND role = 'reward-evaluator' "
+        "ORDER BY category, id"
+    ).fetchall()
+
+    out_path = Path(output) if output else DEFAULT_OUTPUT
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    examples = []
+    for eid, cat, source, convs_json in rows:
+        convs = json.loads(convs_json)
+
+        # Set reward-evaluator system prompt
+        convs = [m for m in convs if m.get("role") != "system"]
+        convs.insert(0, {"role": "system", "content": reward_prompt})
+
+        examples.append({
+            "id": eid,
+            "category": cat,
+            "source": source,
+            "conversations": convs,
+            "module": "capability/reward-evaluator",
+            "license": "Apache-2.0",
+        })
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        for ex in examples:
+            f.write(json.dumps(ex, ensure_ascii=False) + "\n")
+
+    from collections import Counter
+    cats = Counter(ex["category"] for ex in examples)
+    print(f"Exported {len(examples)} examples to {out_path}")
+    for c, n in sorted(cats.items()):
+        print(f"  {c}: {n}")
+
+    conn.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Prepare KE reward evaluator dataset")
+    parser.add_argument("--output", "-o", help="Output JSONL file")
+    args = parser.parse_args()
+    prepare(output=args.output)
+
+
+if __name__ == "__main__":
+    main()
