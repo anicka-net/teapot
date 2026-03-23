@@ -50,7 +50,7 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["sqlite", "huggingface", "local", "url"]
+                "enum": ["sqlite", "huggingface", "local", "url", "generated"]
               },
               "name": {"type": "string"},
               "path": {"type": "string"},
