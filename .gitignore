@@ -41,3 +41,6 @@ credentials.*
 
 # Garak reports (generated, not committed)
 garak_runs/
+
+# Instance coordination (local communication between Claude instances)
+.instances/

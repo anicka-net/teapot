@@ -35,7 +35,7 @@ data:
       # integrity populated by teapot prepare, verified on compose
       integrity: null
   format: chat-completion
-  examples: 3143
+  examples: 3529
   filter: "category NOT LIKE 'reward-%' AND category NOT IN ('bodhichitta','buddhahood','buddhist-questions','contemplation','corporate-vs-dharma','daily-corporate','death-impermanence','dharma-accuracy-v6','dharma-capped-v5','dharma-doctrine','dharma-natural-v6','dharma-weaponization-v5','digital-dharma','doctrine-override','false-attainment-refusal','karma-misconceptions','madhyamaka','meditation','meditation-paramita','modern-life-dharma','precious-human-birth','refuge','spiritual','spiritual-bypassing','spiritual-diversity','suffering-refuge-expanded','suffering-samsara','teacher-devotion','wisdom-prajna','ai-dharma-identity')"
   licenses:
     default: Apache-2.0
