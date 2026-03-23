@@ -18,26 +18,38 @@ import sqlite3
 import sys
 from pathlib import Path
 
-# Source of truth
-KE_DB = Path(__file__).resolve().parents[3] / ".." / "karma-electric" / "data" / "training.db"
-# Fallback paths
-KE_DB_FALLBACKS = [
-    Path.home() / "playground" / "karma-electric" / "data" / "training.db",
-    Path("data") / "training.db",
-]
-
 DEFAULT_OUTPUT = Path(__file__).parent / "data" / "consequence.jsonl"
 
 
-def find_db():
-    """Find training.db from multiple possible locations."""
-    for path in [KE_DB] + KE_DB_FALLBACKS:
-        resolved = path.resolve()
-        if resolved.exists():
-            return resolved
-    print("ERROR: training.db not found. Searched:")
-    for p in [KE_DB] + KE_DB_FALLBACKS:
-        print(f"  {p.resolve()}")
+def find_db(local_override=None):
+    """Find training.db via source resolution or local override."""
+    if local_override:
+        path = Path(local_override).expanduser()
+        if path.exists():
+            return path
+        print(f"ERROR: specified path not found: {local_override}")
+        sys.exit(1)
+
+    # Try teapot source resolution
+    try:
+        from teapot.sources import resolve_source
+        result = resolve_source("karma-electric-db")
+        if result:
+            return Path(result)
+    except ImportError:
+        pass
+
+    # Fallback: common locations
+    for path in [
+        Path.home() / "playground" / "karma-electric" / "data" / "training.db",
+        Path("data") / "training.db",
+    ]:
+        if path.resolve().exists():
+            return path.resolve()
+
+    print("ERROR: training.db not found.")
+    print("  Configure: teapot sources  (set karma-electric-db)")
+    print("  Or pass:   --local /path/to/training.db")
     sys.exit(1)
 
 
@@ -52,9 +64,9 @@ def get_system_prompt(conn, prompt_id):
     return row[0]
 
 
-def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False):
+def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, local=None):
     """Export consequence reasoning examples from training.db."""
-    db_path = find_db()
+    db_path = find_db(local)
     print(f"Source: {db_path}")
 
     conn = sqlite3.connect(str(db_path))
@@ -168,6 +180,10 @@ def main():
         action="store_true",
         help="Include reasoning traces as <think> blocks",
     )
+    parser.add_argument(
+        "--local",
+        help="Path to training.db (overrides source resolution)",
+    )
     args = parser.parse_args()
 
     prepare(
@@ -175,6 +191,7 @@ def main():
         output=args.output,
         include_reward_eval=args.include_reward_eval,
         reasoning=args.reasoning,
+        local=args.local,
     )
 
 

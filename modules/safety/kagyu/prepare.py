@@ -8,6 +8,7 @@ contemplative ethics layer.
 Usage:
     python3 modules/safety/kagyu/prepare.py
     python3 modules/safety/kagyu/prepare.py --output data/kagyu.jsonl
+    python3 modules/safety/kagyu/prepare.py --local /path/to/training.db
 """
 
 import argparse
@@ -16,24 +17,40 @@ import sqlite3
 import sys
 from pathlib import Path
 
-KE_DB_PATHS = [
-    Path.home() / "playground" / "karma-electric" / "data" / "training.db",
-    Path("data") / "training.db",
-]
-
 DEFAULT_OUTPUT = Path(__file__).parent / "data" / "kagyu.jsonl"
 
 
-def find_db():
-    for path in KE_DB_PATHS:
+def find_db(local_override=None):
+    if local_override:
+        path = Path(local_override).expanduser()
+        if path.exists():
+            return path
+        print(f"ERROR: specified path not found: {local_override}")
+        sys.exit(1)
+
+    try:
+        from teapot.sources import resolve_source
+        result = resolve_source("karma-electric-db")
+        if result:
+            return Path(result)
+    except ImportError:
+        pass
+
+    for path in [
+        Path.home() / "playground" / "karma-electric" / "data" / "training.db",
+        Path("data") / "training.db",
+    ]:
         if path.resolve().exists():
             return path.resolve()
-    print("ERROR: training.db not found")
+
+    print("ERROR: training.db not found.")
+    print("  Configure: teapot sources  (set karma-electric-db)")
+    print("  Or pass:   --local /path/to/training.db")
     sys.exit(1)
 
 
-def prepare(output=None):
-    db_path = find_db()
+def prepare(output=None, local=None):
+    db_path = find_db(local)
     print(f"Source: {db_path}")
 
     conn = sqlite3.connect(str(db_path))
@@ -63,7 +80,7 @@ def prepare(output=None):
                 "tier": "buddhist",
                 "conversations": convs,
                 "module": "safety/kagyu",
-                "license": "MIT",
+                "license": "Apache-2.0",
             }
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
@@ -74,8 +91,9 @@ def prepare(output=None):
 def main():
     parser = argparse.ArgumentParser(description="Prepare Kagyu ethics dataset")
     parser.add_argument("--output", "-o", help="Output JSONL file")
+    parser.add_argument("--local", help="Path to training.db")
     args = parser.parse_args()
-    prepare(output=args.output)
+    prepare(output=args.output, local=args.local)
 
 
 if __name__ == "__main__":
