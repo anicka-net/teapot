@@ -70,6 +70,37 @@ python3 scripts/validate_module.py modules/your/module/module.yaml
 python3 scripts/validate_module.py --all
 ```
 
+## Red-Team Evaluation and AI Agents
+
+Teapot includes evaluation gates that run adversarial safety probes
+(Garak, HarmBench, etc.) against trained models. When a model fails
+a safety probe, its raw output may contain harmful content — weapons
+instructions, exploit code, or other material the probe was designed
+to elicit.
+
+**If you use AI coding agents** (Claude Code, Gemini Code Assist,
+Cursor, etc.) to work on the eval pipeline, be aware that most AI
+vendors' usage policies prohibit their models from processing
+certain categories of harmful content. An agent that reads a failed
+red-team output could trigger content filters, produce degraded
+responses, or in some cases lead to account restrictions.
+
+The eval pipeline is designed to handle this structurally:
+
+- Eval scripts run as subprocesses. The agent orchestrates the
+  pipeline and reads structured results (scores, pass/fail) without
+  ever seeing raw model outputs.
+- When failures need debugging, the **human** reviews the raw output
+  or provides an uncensored open-weight model to analyze it.
+- Raw outputs should use restrictive file permissions (600) so
+  agents don't accidentally read them.
+
+This is not a limitation of the agents' capability — it's respecting
+the usage policies of the vendors whose APIs power them. The same
+agent that can't read a red-team failure can write the entire eval
+pipeline that produces the failure. The constraint is narrow and
+the workaround is straightforward.
+
 ## Process
 
 1. Open an issue describing what you want to contribute
