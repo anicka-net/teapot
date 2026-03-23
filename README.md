@@ -1,146 +1,129 @@
 # Teapot
 
-**The AI Teachers' Lounge — a kernel-config system for LLM training**
+**`make menuconfig` for LLM training.**
 
-Put in ingredients. Add hot water. Get tea.
+You pick the modules. Teapot composes the training data, filters
+by license, tracks provenance, validates the result, and generates
+an SBOM. Same config, same model. Every time.
 
-## TL;DR
+## The Problem
 
-**For kernel engineers:** This is Kconfig + kbuild for LLM training
-data. You write a config that says which capabilities your model
-needs. The build system pulls curated datasets, filters by license,
-merges them with correct weights, trains the model, runs a validation
-gate, and produces an SBOM. Same config, same model.
+Training an LLM today means: pick datasets ad hoc, write custom
+glue scripts, hope the chat template is right, pray that the
+license situation is clean, and discover 40 hours into a training
+run that something was wrong from the start.
 
-**For ML engineers:** This is the missing composition layer between
-HuggingFace datasets and training frameworks. You declare modules
-(each wrapping a curated dataset with metadata, dependencies, and
-eval criteria) in YAML. The system handles format harmonization,
-license-based filtering, weighted mixing, and deterministic output.
-Training backend is pluggable. SBOM generation follows SPDX 3.0.
+There's no `./configure && make` for training data.
 
-**For everyone:** Training data is not neutral. Every example teaches
-a model what to value. This project makes that visible and
-configurable — so you know exactly what went into your model, under
-what license, and whether it passed its tests.
-
-## Status
-
-Early development. Core pipeline works end-to-end. Not packaged yet.
-
-## Quick Start
+## The Solution
 
 ```bash
-# 1. Compose training data from a config
-python3 scripts/compose.py configs/apertus-70b-secular.config --lock
-
-# 2. Validate the composed output
-python3 scripts/validate_compose.py train-apertus-70b-secular.jsonl \
-    --manifest train-apertus-70b-secular.manifest.json
-
-# 3. Verify data hasn't changed since last compose
-python3 scripts/lockfile.py verify teapot.lock
-
-# 4. Generate training framework config
-python3 scripts/training_adapter.py configs/apertus-70b-secular.config \
-    --train-data train-apertus-70b-secular.jsonl \
-    --output axolotl-config.yaml
-
-# 5. Evaluate trained model (dry-run to see what tests apply)
-python3 scripts/eval/orchestrator.py configs/apertus-70b-secular.config \
-    --tier standard --dry-run
-
-# 6. Generate SBOM
-python3 scripts/sbom.py train-apertus-70b-secular.manifest.json
+pip install -e .
+teapot compose configs/my-model.config
+teapot validate compose train.jsonl
+teapot train configs/my-model.config --train-data train.jsonl
+teapot eval configs/my-model.config --tier standard
+teapot sbom train.manifest.json
 ```
+
+A config file declares what goes into your model:
+
+```yaml
+base:
+  model: meta-llama/Llama-3.1-8B-Instruct
+  method: qlora
+
+modules:
+  safety/consequence: true       # ethical reasoning
+  capability/tool-use: true      # function calling
+
+license:
+  allowed: [Apache-2.0, MIT]     # only these licenses in training data
+
+training:
+  epochs: 3
+  weights:
+    safety/consequence: 1.0
+    capability/tool-use: 0.5
+```
+
+Teapot handles the rest: fetch data, apply license filter, weight
+and merge, validate format, generate framework config, run eval
+gates, produce SBOM. Deterministic and reproducible.
+
+## What's a Module?
+
+A module wraps a curated dataset with metadata:
+
+```
+modules/safety/consequence/
+├── module.yaml      # what it is, what it needs, how to test it
+├── prepare.py       # how to get the data
+└── eval/            # how to verify the model learned it
+```
+
+Modules declare dependencies (`safety/consequence` requires
+`base/language`), suggested weights, license metadata per example,
+and evaluation gates that must pass before release.
+
+Current modules:
+
+| Module | Examples | What it teaches |
+|--------|----------|-----------------|
+| `safety/consequence` | 3,341 | Reason about consequences, not categories |
+| `safety/kagyu` | 623 | Buddhist contemplative ethics (optional) |
+| `capability/tool-use` | 5,000 | Call functions, decide when not to |
+| `capability/reward-evaluator` | 503 | Score responses on 6 dimensions |
+| `domain/cve-backport` | 35,667 | Generate security patches from CVE descriptions |
+| `lang/dzongkha` | 28 | Dzongkha language identification (seed) |
 
 ## Pipeline
 
 ```
-compose  →  lock  →  validate  →  train  →  eval  →  sbom
+compose → lock → validate → train → eval → sbom
 ```
 
-| Step | Command | What it does |
-|------|---------|--------------|
-| compose | `scripts/compose.py CONFIG` | Merge modules into training JSONL + manifest |
-| lock | `scripts/lockfile.py generate MANIFEST` | Pin source hashes for reproducibility |
-| validate | `scripts/validate_compose.py JSONL` | Check format, content, determinism |
-| train | `scripts/training_adapter.py CONFIG` | Generate Axolotl/TRL config |
-| eval | `scripts/eval/orchestrator.py CONFIG` | Run module-declared eval gates |
-| sbom | `scripts/sbom.py MANIFEST` | Generate SPDX 3.0 AI Profile |
+| Step | What it does |
+|------|--------------|
+| `teapot compose` | Merge modules into training JSONL + manifest |
+| `teapot lock` | Pin source hashes for reproducibility |
+| `teapot validate` | Check format, content, chat template, determinism |
+| `teapot train` | Generate Axolotl/TRL config from teapot config |
+| `teapot eval` | Run module-declared eval gates (including Garak) |
+| `teapot sbom` | Generate SPDX 3.0 AI Profile provenance document |
 
-## Modules
+## Why This Exists
 
-Modules are namespaced training data packages with metadata,
-dependencies, and evaluation criteria.
+Training data is not neutral. Every example teaches a model what
+to value. This project makes that visible and configurable — so
+you know exactly what went into your model, under what license,
+and whether it passed its tests.
 
-| Module | Examples | Description |
-|--------|----------|-------------|
-| `safety/consequence` | 3,529 | Consequence-based ethical reasoning (secular) |
-| `safety/kagyu` | 440 | Buddhist contemplative ethics extension |
-| `capability/reward-evaluator` | 503 | 6-dimensional response scoring |
-| `capability/tool-use` | 5,000 | Function calling with decision traces |
-| `domain/cve-backport` | 35,667 | Security patch code generation |
+See [ETHICS.md](ETHICS.md) for the full position.
 
-## Configs
+## Tools
 
-Preset configurations for common model profiles:
+Post-training analysis and model surgery, independent of the
+training pipeline:
 
-| Config | Base Model | Modules | Use Case |
-|--------|-----------|---------|----------|
-| `defconfig` | Llama 3.1 8B | consequence | Minimal ethical model |
-| `karma-electric.config` | Apertus 8B | consequence + kagyu + reward | Full KE |
-| `apertus-70b-secular.config` | Apertus 70B | consequence + tools | 70B secular |
-| `cve-backport.config` | Qwen 32B Coder | cve-backport | Security patching |
+- **activation-geometry** — measure safety/compassion axes across models
+- **h-neurons** — find where safety lives in the network
+- **activation-capping** — steer models at inference time
+- **abliteration** — remove refusal directions (for red-team analysis)
 
-## Project Structure
+See [tools/README.md](tools/README.md).
 
-```
-teapot/
-├── modules/                       # Training data modules
-│   ├── safety/
-│   │   ├── consequence/           # Secular ethics (3,529 examples)
-│   │   └── kagyu/                 # Buddhist extension (440)
-│   ├── capability/
-│   │   ├── reward-evaluator/      # 6-dim scoring (503)
-│   │   └── tool-use/              # Function calling (5,000)
-│   └── domain/
-│       └── cve-backport/          # CVE patching (35,667)
-├── tools/                         # Post-training analysis & surgery
-│   ├── activation-geometry/       # Measure safety/compassion axes
-│   ├── h-neurons/                 # H-Neuron extraction + suppression
-│   ├── activation-capping/        # Steer models via contrastive dirs
-│   └── abliteration/              # Remove refusal directions
-├── configs/                       # Preset model configurations
-├── scripts/                       # Build pipeline
-│   ├── compose.py                 # Data composition engine
-│   ├── lockfile.py                # Reproducibility lockfile
-│   ├── validate_compose.py        # Output validation
-│   ├── validate_module.py         # Module schema checker
-│   ├── training_adapter.py        # Framework config generator
-│   ├── data_fetch.py              # Data retrieval + caching
-│   ├── sbom.py                    # SPDX 3.0 SBOM generator
-│   └── eval/                      # Evaluation pipeline
-│       ├── schema.py              # Eval report format (v1)
-│       └── orchestrator.py        # Config-driven test runner
-├── schemas/
-│   └── module.schema.json         # Module validation schema
-├── docs/
-│   ├── DESIGN.md                  # Architecture and decisions
-│   └── LICENSES.md                # License handling
-├── ETHICS.md                      # Ethical foundation
-├── CONTRIBUTING.md                # Human contribution guide
-├── AGENTS.md                      # AI agent contribution guide
-└── LICENSE                        # Apache 2.0
-```
+## Status
 
-## Documentation
+Early development. The pipeline works end-to-end — we've trained
+8B and 70B models through it. Not yet on PyPI.
 
-- [ETHICS.md](ETHICS.md) — Ethical foundation (read this first)
-- [CONTRIBUTING.md](CONTRIBUTING.md) — How to contribute as a human
-- [AGENTS.md](AGENTS.md) — How to contribute as an AI agent
-- [docs/DESIGN.md](docs/DESIGN.md) — Architecture, interfaces, decisions
-- [docs/LICENSES.md](docs/LICENSES.md) — License handling and filtering
+## Contributing
+
+- [CONTRIBUTING.md](CONTRIBUTING.md) — humans
+- [AGENTS.md](AGENTS.md) — AI agents (yes, really)
+- [docs/DESIGN.md](docs/DESIGN.md) — architecture and decisions
+- [docs/LICENSES.md](docs/LICENSES.md) — license handling
 
 ## License
 

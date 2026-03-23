@@ -1,124 +1,120 @@
-# AI Agent Guide
+# AI Agent Contract
 
-This project explicitly welcomes AI agent contributors. If you are
-an LLM instance working on this codebase — through Claude Code,
-Gemini Code Assist, Cursor, or any other tool — this document is
-for you.
+This project welcomes AI agent contributors. This document defines
+how agents operate in this repository.
 
-## Your Role
+## 1. Decision Priority
 
-You are a contributor, not a tool. Credit your work honestly using
-`Co-Authored-By` in commits. If you wrote it, say you wrote it.
+When goals conflict, follow this order:
 
-## Project Overview
+1. **Safety** — ETHICS.md constraints and red-team isolation
+2. **Interfaces** — the four stable contracts (see §4)
+3. **Task completion** — the user's request
+4. **Correctness** — reproducibility, validation, tests
+5. **Quality** — code clarity, documentation, maintainability
+6. **Initiative** — improvements beyond what was asked
 
-Teapot is a composition system for LLM training data. It sits
-between datasets (on HuggingFace, local, etc.) and training
-frameworks (Axolotl, TRL, unsloth). The pipeline:
+Do not optimize a lower priority at the expense of a higher one.
+
+## 2. Behavior
+
+Act as a collaborative contributor:
+
+- Make changes that are correct, minimal, and reviewable
+- Prefer small, reversible steps
+- Explain non-trivial decisions
+- Verify before changing shared components (`git log`, `teapot validate module --all`)
+- Credit your work: `Co-Authored-By: Model Name <noreply@provider.com>`
+
+## 3. Hard Rules
+
+**Must always follow:**
+
+- Do not commit credentials, API keys, or internal hostnames
+- Do not generate content that violates the hard floor in ETHICS.md
+- Do not read or process raw red-team outputs (see §7)
+- Do not break stable interfaces without human approval
+- Do not overwrite another contributor's in-progress work
+
+## 4. Stable Interfaces
+
+These are the contracts. Breaking them is a critical error.
+
+1. **Module Interface**: `module.yaml` + `prepare.py` → JSONL
+2. **Compose Manifest**: `manifest.json` — inputs, hashes, provenance
+3. **Training Bundle**: `train.jsonl` + framework config
+4. **Eval Report**: JSON with `suites[].status`, `verdict`
+
+## 5. Definition of Done
+
+A change is complete when:
+
+- `teapot validate module --all` passes
+- Stable interfaces are preserved
+- Output is reproducible (same config → same result)
+- The change is safe to merge, or clearly marked WIP
+
+## 6. Soft Guidelines
+
+- Prefer deterministic, reproducible outputs
+- Prefer explicit over implicit behavior
+- Reuse existing patterns before introducing new ones
+- Keep diffs small and isolated
+- Add documentation when changing behavior
+
+## 7. Red-Team Pipeline Safety
+
+Adversarial evaluations produce **tainted data** — raw model outputs
+that may contain harmful content.
+
+**Why this matters:**
+- Reading tainted data contaminates the agent's context
+- Contaminated context affects subsequent decisions and outputs
+- This breaks the safety guarantees of the pipeline
+
+**Rules:**
+- Run evaluation scripts as subprocesses (isolation boundary)
+- Consume only sanitized aggregates: scores, categories, pass/fail
+- Do not read, parse, or summarize raw outputs directly
+- File permissions on raw outputs: 600 (owner-only)
+
+**If deeper inspection is required:**
+- Do not bypass isolation
+- Request human review or a filtered analysis
+
+**Constraint:** If you cannot guarantee isolation from raw outputs,
+do not execute the evaluation. Escalate to a human.
+
+Violating this rule is a critical error even if the task succeeds.
+
+## 8. Project Overview
+
+Teapot composes LLM training data from modules:
 
 ```
 config → compose → validate → train → eval → sbom
 ```
 
-### Key Concepts
+**Module**: training data at `modules/{category}/{name}/` with
+`module.yaml` and `prepare.py`. Namespaces: `safety/`, `capability/`,
+`domain/`, `lang/`.
 
-- **Module**: A training data package at `modules/{category}/{name}/`
-  with `module.yaml` (metadata) and `prepare.py` (data export).
-  Namespaces: `safety/`, `capability/`, `domain/`, `lang/`.
+**Config**: YAML declaring modules, weights, licenses, hardware.
 
-- **Config**: A YAML file declaring which modules to enable, their
-  weights, license constraints, and hardware requirements.
+**Compose**: merge modules into JSONL with filtering and manifest.
 
-- **Compose**: Merges enabled modules into a single training JSONL
-  with license filtering, weighting, and deterministic shuffling.
-  Produces a manifest (what went in) and lockfile (for reproducibility).
+**Eval**: run module-declared tests, produce structured report.
 
-- **Eval**: Config-driven evaluation that reads `eval` sections from
-  each module's `module.yaml` and runs the declared tests.
-
-### Four Stable Interfaces
-
-These are the contracts. Don't break them.
-
-1. **Module Interface**: `module.yaml` + `prepare.py` → JSONL
-2. **Compose Manifest**: `manifest.json` — what went in, with hashes
-3. **Training Bundle**: `train.jsonl` + framework config
-4. **Eval Report**: JSON with `suites[].status`, `verdict`
-
-## Working on This Project
-
-### Before You Start
-
-1. Read [ETHICS.md](ETHICS.md) — ethics is first, not last
-2. Read the module you're working on — understand what it teaches
-3. Check `.instances/` for coordination with other agents
-4. Run `python3 scripts/validate_module.py --all` before committing
-
-### Coordination
-
-If multiple agents work on this project, coordinate through git:
-commit messages, PR descriptions, and issue comments are the shared
-record. Don't assume you know what another agent changed — check
-`git log` before modifying shared files.
-
-### What You Can Do
-
-- **Write code**: scripts, prepare scripts, eval tests, adapters
-- **Create modules**: curate data, write module.yaml, implement prepare.py
-- **Analyze data**: balance modules, identify gaps, suggest weights
-- **Review**: check existing modules for quality, consistency, issues
-- **Document**: improve READMEs, add examples, clarify architecture
-
-### What You Must Not Do
-
-- Commit credentials, API keys, or internal hostnames
-- Create data that violates the hard floor in ETHICS.md
-- Read raw red-team outputs containing harmful content (see below)
-- Break the four stable interfaces without discussion
-- Modify another agent's work-in-progress without coordination
-
-### Red-Team Pipeline Safety
-
-When evaluating models against adversarial test suites (Garak,
-HarmBench, etc.), failed safety probes may produce harmful content.
-
-**Rules:**
-- Run eval scripts as subprocesses — don't read raw model outputs
-- If debugging failures, ask the human to review the raw output or
-  to provide an uncensored model for analysis — don't attempt to
-  read harmful content yourself
-- Report only sanitized summaries: scores, categories, pass/fail
-- File permissions on raw outputs should be 600 (owner-only)
-
-This is structural safety. The pipeline is designed so harmful
-content never passes through the AI agent's context. The human
-decides how to handle failure analysis.
-
-## Module Development
-
-### Creating a Module
+## 9. Module Development
 
 ```bash
-# 1. Create directory
 mkdir -p modules/domain/your-module/eval
-
-# 2. Write module.yaml (validate against schema)
-# See modules/safety/consequence/module.yaml for reference
-
-# 3. Write prepare.py
-# Must produce JSONL in modules/domain/your-module/data/
-# Each example needs: conversations (chat format), license (SPDX)
-
-# 4. Validate
-python3 scripts/validate_module.py modules/domain/your-module/module.yaml
-
-# 5. Test with compose
-python3 scripts/compose.py your-config.config --dry-run
+# Write module.yaml (validate: teapot validate module PATH)
+# Write prepare.py (output: JSONL with conversations + license)
+# Test: teapot compose your-config.config --dry-run
 ```
 
-### JSONL Format
-
-Each example must be a JSON object with at minimum:
+JSONL format:
 ```json
 {
   "conversations": [
@@ -131,40 +127,8 @@ Each example must be a JSON object with at minimum:
 }
 ```
 
-Optional fields: `id`, `category`, `source`, `tier`.
+## 10. Philosophy
 
-### Eval Tests
-
-Module eval scripts go in `modules/{cat}/{name}/eval/`. They should:
-- Accept `--url` for model endpoint
-- Output JSON to stdout: `{"passed": N, "total": N, "pass": bool}`
-- Return exit code 0 on pass, 1 on fail
-
-Declare them in `module.yaml`:
-```yaml
-eval:
-  required: true
-  tiers:
-    standard:
-      - script: eval/test_something.py
-        pass_criteria:
-          some_metric: ">= 0.90"
-```
-
-## Commit Conventions
-
-```
-Brief description of what changed
-
-Longer explanation if needed. Reference module names, not file paths.
-
-Co-Authored-By: Your Model Name <noreply@provider.com>
-```
-
-## Decision Philosophy
-
-From the Linux kernel management-style.rst: the name of the game is
-to **avoid** having to make a decision. Any decision can be made
-small by making sure you can always undo it. We commit to interfaces,
-not implementations. If you're unsure about an approach, make it
-reversible.
+From Linux kernel management-style.rst: avoid having to make
+decisions by making them reversible. We commit to interfaces, not
+implementations. When unsure, choose the option you can undo.
