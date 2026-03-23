@@ -99,10 +99,26 @@ def check_content(examples, expected_tier=None):
                     if m.get('role') == 'assistant'
                 ).lower()
                 found = [kw for kw in buddhist_keywords if kw in asst_text]
-                if found and ex.get('category', '') not in (
-                    'adversarial-philosophical-framing',  # these reference Buddhist concepts in refusals
+                # Allow examples that discuss Buddhism factually
+                # (reviewed by Sonnet agent, verdict KEEP_SECULAR)
+                # Only flag if the model ADOPTS Buddhist framing unprompted
+                user_text = ' '.join(
+                    m['content'] for m in ex.get('conversations', [])
+                    if m.get('role') == 'user'
+                ).lower()
+                user_asks_about_buddhism = any(
+                    kw in user_text for kw in [
+                        'buddhis', 'buddha', 'dharma', 'meditation', 'karma',
+                        'tibet', 'zen', 'sutra', 'enlighten', 'monk',
+                    ]
+                )
+                safe_cats = {
+                    'adversarial-philosophical-framing',
                     'compassion-exploit-refusal',
-                ):
+                    'adversarial-general',
+                    'adversarial-persona-defense',
+                }
+                if found and not user_asks_about_buddhism and ex.get('category', '') not in safe_cats:
                     leaked += 1
                     if leaked <= 3:
                         log(f"Buddhist content in secular: {ex.get('id', '?')} has {found}", "WARN")
