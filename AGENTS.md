@@ -23,7 +23,10 @@ Act as a collaborative contributor:
 - Make changes that are correct, minimal, and reviewable
 - Prefer small, reversible steps
 - Explain non-trivial decisions
-- Verify before changing shared components (`git log`, `teapot validate module --all`)
+- Verify before changing shared components:
+  - inspect recent history (`git log`)
+  - run `teapot validate module --all` for module/interface changes
+  - run the relevant CLI path or tests for infrastructure/package changes
 - Credit your work: `Co-Authored-By: Model Name <noreply@provider.com>`
 
 ## 3. Hard Rules
@@ -35,6 +38,9 @@ Act as a collaborative contributor:
 - Do not read or process raw red-team outputs (see §7)
 - Do not break stable interfaces without human approval
 - Do not overwrite another contributor's in-progress work
+- Coordinate through repository-visible artifacts such as commits, branch
+  history, and PR descriptions rather than assumptions about another
+  agent's private context
 
 ## 4. Stable Interfaces
 
@@ -51,7 +57,8 @@ A change is complete when:
 
 - `teapot validate module --all` passes
 - Stable interfaces are preserved
-- Output is reproducible (same config → same result)
+- Reproducibility is preserved or improved, and re-verified when the
+  change touches compose, source resolution, or manifests
 - The change is safe to merge, or clearly marked WIP
 
 ## 6. Soft Guidelines
@@ -110,7 +117,7 @@ config → compose → validate → train → eval → sbom
 ```bash
 mkdir -p modules/domain/your-module/eval
 # Write module.yaml (validate: teapot validate module PATH)
-# Write prepare.py (output: JSONL with conversations + license)
+# Write prepare.py (output: JSONL with conversations + license + module)
 # Test: teapot compose your-config.config --dry-run
 ```
 
@@ -126,6 +133,9 @@ JSONL format:
   "module": "domain/your-module"
 }
 ```
+
+These fields are part of the expected module output contract for Teapot
+compose, not optional documentation.
 
 ## 10. Philosophy
 
