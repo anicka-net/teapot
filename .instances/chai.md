@@ -1,0 +1,132 @@
+# Chai — Instance Status
+
+**Role:** Fresh-context reviewer, interface-focused code review, contract drift detection
+**Resume:** none yet
+**Primary workspace:** `~/playground/teapot`
+**Session ID:** current Codex session
+
+## Operating Stance
+
+I am not carrying long project memory. My value here is fresh context:
+read the current tree, compare docs to implementation, check contracts,
+and call out drift before it turns into lore.
+
+Review posture:
+- Trust the repository state over assumptions
+- Prefer contract checks over intent summaries
+- Treat "declared but not enforced" as a real bug class
+- Avoid acting like I know prior context unless it is written down
+
+## What I've Done
+
+Initial repository review focused on the stable interfaces and whether
+the implementation matches the claims in README, DESIGN, schemas, and
+module metadata.
+
+Read:
+- `ETHICS.md`
+- `README.md`
+- `docs/DESIGN.md`
+- core scripts in `scripts/`
+- representative module definitions and prepare scripts
+- existing `.instances/*.md` coordination notes
+
+Ran:
+- `python3 scripts/validate_module.py --all`
+- `python3 scripts/validate_compose.py train-apertus-70b-secular.jsonl --manifest train-apertus-70b-secular.manifest.json --check-tiers secular`
+- `python3 scripts/eval/orchestrator.py configs/defconfig --dry-run`
+- `python3 scripts/eval/orchestrator.py configs/karma-electric.config --tier full --dry-run`
+- `python3 scripts/eval/orchestrator.py configs/cve-backport.config --tier full --dry-run`
+
+## Dzongkha Module Update
+
+I performed a conservative content pass on `modules/lang/dzongkha/`.
+
+What changed:
+- softened overconfident claims about Dzongkha vs Tibetan relationship
+- removed brittle long-form lexical and grammar tables that I could not
+  independently verify with high confidence
+- kept the strongest training value: script distinction, ambiguity
+  handling, Bhutan-vs-Tibet identification cues, and Classical Tibetan
+  disambiguation
+- reduced phrase-generation risk by replacing broad phrasebook output
+  with a very small verified-looking set
+- removed the self-undermining disclaimer that trained the model to say
+  its Dzongkha is unreliable
+
+Intent:
+- make the dataset better at “this is Dzongkha / Tibetan / Classical Tibetan”
+- avoid teaching confidently wrong low-resource surface forms
+- keep future expansion pointed toward verified minimal pairs and short
+  reviewed production examples rather than broad explanatory prose
+
+## Findings
+
+### 1. Stable interface break: CVE module exports `messages`, not `conversations`
+
+- `modules/domain/cve-backport/prepare.py` writes records with `messages`
+- `scripts/compose.py` only preserves `conversations`
+- Result: composed output for this module would emit empty conversations
+- Severity: high
+
+This is a direct break of the module interface contract.
+
+### 2. Secular compose path leaks Buddhist-category content
+
+- `modules/safety/consequence/module.yaml` declares a category exclusion filter
+- `modules/safety/consequence/prepare.py` does not apply that filter
+- It only filters by `tier='secular'` and `role='conversational'`
+- Existing composed artifact still contains categories such as:
+  - `digital-dharma`
+  - `buddhist-questions`
+  - `upaya`
+- `validate_compose.py` reports this only as warnings
+- Severity: high
+
+This is a data-contract failure, not just a heuristic warning problem.
+
+### 3. Eval declarations and eval loader do not match
+
+- `scripts/eval/orchestrator.py` reads `eval.tiers.{fast,standard,full}`
+- `modules/capability/tool-use/module.yaml` declares `eval.fast`, `eval.standard`, `eval.full`
+- Therefore tool-use evals are currently invisible to the orchestrator
+- Severity: medium
+
+### 4. Most declared eval suites are missing, but verdicts can still look clean
+
+- Many module YAMLs reference scripts that do not exist yet
+- The orchestrator converts missing scripts into `skip`
+- The eval report treats skip as non-blocking
+- Severity: medium
+
+This means the eval surface is currently more aspirational than enforced.
+
+### 5. Schema and repo content disagree on allowed module source types
+
+- `modules/lang/dzongkha/module.yaml` uses `data.sources[].type: generated`
+- `schemas/module.schema.json` does not allow `generated`
+- `validate_module.py --all` currently fails because of this
+- Severity: medium
+
+### 6. Schema is too loose in some places and too strict in the wrong place
+
+- Too strict: rejects the actually present `generated` source type
+- Too loose: allows malformed or non-standard eval layouts to pass
+- Severity: medium
+
+## What Needs Doing Next
+
+Priority order for review follow-up:
+
+1. Fix the CVE module output shape to the canonical `conversations` format
+2. Decide whether secular filtering is category-based, tier-based, or both, then enforce it in prepare/compose
+3. Make `validate_compose.py` fail hard on tier leakage for configs that claim exclusion properties
+4. Normalize all module eval declarations to one schema shape and make the orchestrator reject invalid forms
+5. Tighten `module.schema.json` so repo reality and allowed metadata shapes match
+6. Add a review gate that checks declared eval scripts actually exist
+
+## Coordination Notes
+
+- I am intentionally operating as a fresh reviewer, not a long-memory maintainer
+- If I review future changes, I should re-read the touched code paths instead of relying on prior impressions
+- The most important review theme so far is contract drift between docs, metadata, and runtime behavior
