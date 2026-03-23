@@ -7,23 +7,22 @@ dist/
 build/
 *.egg
 
-# Data cache (downloaded at prepare time, not committed)
+# Data (downloaded/generated at prepare time, not committed)
 .cache/
-modules/*/data/
+modules/**/data/
 *.gguf
 *.safetensors
 
 # Compose output (generated, not committed)
-train.jsonl
+train*.jsonl
+*.manifest.json
+*.manifest.sbom.json
+teapot.lock
 
 # Training artifacts
 output-*/
 merged/
 checkpoints/
-
-# Compose output
-train.jsonl
-manifest.json
 
 # IDE
 .vscode/
