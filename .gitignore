@@ -43,3 +43,4 @@ garak_runs/
 
 # Instance coordination (local communication between Claude instances)
 .instances/
+.venv/

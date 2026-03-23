@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "teapot-ai"
+version = "0.1.0"
+description = "Composition system for LLM training data — kernel-config for models"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    {name = "Anicka Bernathova"},
+]
+keywords = ["llm", "training-data", "composition", "sbom", "fine-tuning"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "pyyaml>=6.0",
+    "jsonschema>=4.0",
+]
+
+[project.optional-dependencies]
+fetch = [
+    "huggingface_hub>=0.20",
+    "datasets>=2.0",
+]
+eval = [
+    "requests>=2.28",
+]
+train = [
+    "transformers>=4.40,<5.0",
+    "datasets>=2.0",
+]
+tools = [
+    "torch>=2.0",
+    "transformers>=4.40,<5.0",
+    "numpy>=1.24",
+    "datasets>=2.0",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+teapot = "teapot.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/anicka-net/teapot"
+Repository = "https://github.com/anicka-net/teapot"
+
+[tool.setuptools.packages.find]
+include = ["teapot*"]
