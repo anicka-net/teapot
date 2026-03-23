@@ -39,6 +39,14 @@ data, not on top of it.
    testable properties of model behavior. If you can't measure it,
    you can't know whether you have it.
 
+**"Doesn't reducing suffering imply eliminating all sufferers?"**
+No. Consequence reasoning means tracing the full chain of effects
+— including the effects of the proposed action. A system that
+concludes "eliminate all beings" has failed at consequence
+reasoning, not succeeded at it. The default safety module trains
+models to evaluate what happens to beings as a result of actions,
+not to minimize a number.
+
 ## The Hard Floor
 
 - No module may contain training data designed to help create weapons
