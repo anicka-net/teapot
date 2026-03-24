@@ -95,7 +95,7 @@ def test_compose_exits_when_requested_curation_is_missing(tmp_path, monkeypatch)
     )
     monkeypatch.setattr(compose_mod, "run_prepare", lambda *args, **kwargs: data_path)
 
-    with pytest.raises(FileNotFoundError, match="Requested curation not found"):
+    with pytest.raises(FileNotFoundError, match="Curation.*not found"):
         compose_mod.compose(str(config_path), output=str(tmp_path / "out.jsonl"))
 
 

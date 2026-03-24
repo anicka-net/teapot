@@ -33,16 +33,29 @@ from teapot.root import find_root
 CURATIONS_DIR = find_root() / ".curations"
 
 
-def create_curation(module, version, scorer, decisions, scorer_version=None, notes=None):
+def create_curation(module, version, scorer, decisions, scorer_version=None,
+                     notes=None, publish=False):
     """Create a curation manifest from a list of decisions.
 
     Each decision: {"id": "example-id", "verdict": "KEEP|MOVE|DELETE|NEEDS_EDIT",
                      "score": float|null, "tags": [...], "reason": "..."}
+
+    If publish=True, writes to the module directory (shared).
+    Otherwise writes to .curations/ (local, gitignored).
     """
-    CURATIONS_DIR.mkdir(exist_ok=True)
+    if publish:
+        parts = module.split("/")
+        out_dir = find_root() / "modules" / "/".join(parts) / "curations"
+    else:
+        out_dir = CURATIONS_DIR
+
+    out_dir.mkdir(exist_ok=True, parents=True)
 
     slug = module.replace("/", "-")
-    filename = f"{slug}-{version}.json"
+    if publish:
+        filename = f"{version}.json"
+    else:
+        filename = f"{slug}-{version}.json"
 
     manifest = {
         "module": module,
@@ -58,7 +71,7 @@ def create_curation(module, version, scorer, decisions, scorer_version=None, not
     if notes:
         manifest["notes"] = notes
 
-    path = CURATIONS_DIR / filename
+    path = out_dir / filename
     with open(path, "w") as f:
         json.dump(manifest, f, indent=2)
 
@@ -74,19 +87,28 @@ def create_curation(module, version, scorer, decisions, scorer_version=None, not
 
 
 def list_curations():
-    """List all curation manifests."""
-    if not CURATIONS_DIR.exists():
+    """List all curation manifests (published + local)."""
+    root = find_root()
+    manifests = []
+
+    # Tier 1: published curations in module directories
+    modules_dir = root / "modules"
+    if modules_dir.exists():
+        for path in sorted(modules_dir.rglob("curations/*.json")):
+            manifests.append(("published", path))
+
+    # Tier 2: local curations
+    if CURATIONS_DIR.exists():
+        for path in sorted(CURATIONS_DIR.glob("*.json")):
+            manifests.append(("local", path))
+
+    if not manifests:
         print("No curations found. Create one with: teapot curate create")
         return []
 
-    manifests = sorted(CURATIONS_DIR.glob("*.json"))
-    if not manifests:
-        print("No curations found.")
-        return []
-
-    print(f"Curations in {CURATIONS_DIR}/:")
+    print("Curations:")
     print()
-    for path in manifests:
+    for tier, path in manifests:
         try:
             data = json.loads(path.read_text())
             module = data.get("module", "?")
@@ -96,7 +118,8 @@ def list_curations():
             summary = data.get("summary", {})
             ts = data.get("timestamp", "?")[:10]
             summary_str = ", ".join(f"{k}:{v}" for k, v in summary.items())
-            print(f"  {path.name}")
+            tier_label = "published" if tier == "published" else "local"
+            print(f"  [{tier_label}] {path.name}")
             print(f"    {module} {version} by {scorer} ({ts})")
             print(f"    {total} decisions: {summary_str}")
             print()
@@ -247,6 +270,8 @@ def main():
     create_p.add_argument("--scorer", required=True, help="Who scored (human, sonnet-4.6, etc.)")
     create_p.add_argument("--input", required=True, help="Decisions JSONL file")
     create_p.add_argument("--notes", default=None, help="Notes about this curation")
+    create_p.add_argument("--publish", action="store_true",
+                          help="Save to module directory (shared) instead of .curations/ (local)")
 
     # create-from-db
     db_p = sub.add_parser("create-from-db", help="Import curation from training.db notes")
@@ -254,6 +279,8 @@ def main():
     db_p.add_argument("--version", required=True)
     db_p.add_argument("--scorer", required=True)
     db_p.add_argument("--db", required=True, help="Path to training.db")
+    db_p.add_argument("--publish", action="store_true",
+                      help="Save to module directory (shared)")
 
     # list
     sub.add_parser("list", help="List all curations")
@@ -274,10 +301,12 @@ def main():
 
     if args.command == "create":
         decisions = import_from_jsonl(args.input)
-        create_curation(args.module, args.version, args.scorer, decisions, notes=args.notes)
+        create_curation(args.module, args.version, args.scorer, decisions,
+                        notes=args.notes, publish=args.publish)
     elif args.command == "create-from-db":
         decisions = import_from_db_notes(args.db, args.module)
-        create_curation(args.module, args.version, args.scorer, decisions)
+        create_curation(args.module, args.version, args.scorer, decisions,
+                        publish=args.publish)
     elif args.command == "list":
         list_curations()
     elif args.command == "show":

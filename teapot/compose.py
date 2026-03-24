@@ -192,18 +192,44 @@ def run_prepare(module_dir, module_name, chat_template="chatml", include_reasoni
 
 
 def load_curation(module_name, version):
-    """Load a curation manifest for a module."""
-    curations_dir = TEAPOT_ROOT / ".curations"
+    """Load a curation manifest for a module.
+
+    Two-tier lookup:
+    1. Module directory: modules/{cat}/{name}/curations/{version}.json
+       (committed, shared with everyone)
+    2. Local cache: .curations/{slug}-{version}.json
+       (gitignored, local experiments)
+    """
     slug = module_name.replace("/", "-")
-    path = curations_dir / f"{slug}-{version}.json"
-    if not path.exists():
+    parts = module_name.split("/")
+    module_dir = TEAPOT_ROOT / "modules" / "/".join(parts)
+
+    # Tier 1: published curations in module directory
+    candidates = [
+        module_dir / "curations" / f"{version}.json",
+        module_dir / "curations" / f"{parts[-1]}-{version}.json",
+    ]
+
+    # Tier 2: local curations
+    candidates.append(TEAPOT_ROOT / ".curations" / f"{slug}-{version}.json")
+
+    path = None
+    for candidate in candidates:
+        if candidate.exists():
+            path = candidate
+            break
+
+    if not path:
+        searched = "\n  ".join(str(c) for c in candidates)
         raise FileNotFoundError(
-            f"Requested curation not found for {module_name}: {path}"
+            f"Curation '{version}' not found for {module_name}. Searched:\n  {searched}"
         )
+
     data = json.loads(path.read_text())
     return {
         "path": path,
         "version": data.get("version", version),
+        "tier": "published" if "modules/" in str(path) else "local",
         "decisions": {d["id"]: d.get("verdict", "KEEP") for d in data.get("decisions", [])},
     }
 
