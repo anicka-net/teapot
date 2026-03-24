@@ -48,6 +48,23 @@ def estimate_batch_config(vram_gb, n_gpus, model_size_hint):
             return 1, 16
 
 
+def detect_or_default_hardware(hardware, model_name, method, default_vram, default_gpus):
+    """Resolve hardware from config or runtime detection with a safe fallback."""
+    if hardware and (hardware.get("vram_gb") or hardware.get("gpus")):
+        return hardware.get("vram_gb", default_vram), hardware.get("gpus", default_gpus)
+
+    try:
+        from teapot.hardware import detect_gpus, suggest_training_params
+
+        gpus = detect_gpus()
+        if gpus:
+            params = suggest_training_params(gpus, model_name, method)
+            return params.get("vram_per_gpu", default_vram), params.get("gpus", default_gpus)
+    except ImportError:
+        pass
+    return default_vram, default_gpus
+
+
 def generate_axolotl(teapot_config, train_data, output):
     """Generate Axolotl YAML from Teapot config."""
     with open(teapot_config) as f:
@@ -61,22 +78,12 @@ def generate_axolotl(teapot_config, train_data, output):
     method = base.get("method", "qlora")
 
     # Auto-detect hardware if not specified in config
-    if not hardware or (not hardware.get("vram_gb") and not hardware.get("gpus")):
-        try:
-            from teapot.hardware import detect_gpus, suggest_training_params
-            gpus = detect_gpus()
-            if gpus:
-                params = suggest_training_params(gpus, model_name, method)
-                vram = params.get("vram_per_gpu", 24)
-                n_gpus = params.get("gpus", 1)
-                print(f"Auto-detected: {n_gpus} GPU(s), {vram} GB each")
-            else:
-                vram, n_gpus = 24, 1
-        except ImportError:
-            vram, n_gpus = 24, 1
-    else:
+    if hardware and (hardware.get("vram_gb") or hardware.get("gpus")):
         vram = hardware.get("vram_gb", 24)
         n_gpus = hardware.get("gpus", 1)
+    else:
+        vram, n_gpus = detect_or_default_hardware(hardware, model_name, method, 24, 1)
+        print(f"Auto-detected: {n_gpus} GPU(s), {vram} GB each")
 
     micro_batch, grad_accum = estimate_batch_config(vram, n_gpus, model_name)
 
@@ -186,8 +193,12 @@ def generate_qlora_hf(teapot_config, train_data, eval_data, output):
 
     model_name = base.get("model", "Qwen/Qwen2.5-Coder-32B-Instruct")
     method = base.get("method", "qlora")
-    vram = hardware.get("vram_gb", 94)
-    n_gpus = hardware.get("gpus", 2)
+    if hardware and (hardware.get("vram_gb") or hardware.get("gpus")):
+        vram = hardware.get("vram_gb", 94)
+        n_gpus = hardware.get("gpus", 2)
+    else:
+        vram, n_gpus = detect_or_default_hardware(hardware, model_name, method, 94, 2)
+        print(f"Auto-detected: {n_gpus} GPU(s), {vram} GB each")
 
     micro_batch, grad_accum = estimate_batch_config(vram, n_gpus, model_name)
     micro_batch = training.get("batch_size", micro_batch)

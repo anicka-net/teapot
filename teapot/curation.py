@@ -189,9 +189,20 @@ def import_from_db_notes(db_path, module):
     import sqlite3
     conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
 
+    columns = {
+        row[1] for row in conn.execute("PRAGMA table_info(examples)").fetchall()
+    }
+    if "module" not in columns:
+        conn.close()
+        raise ValueError(
+            "training.db examples table has no 'module' column; "
+            "cannot safely import module-scoped curation from notes"
+        )
+
     rows = conn.execute(
         "SELECT id, category, tier, notes FROM examples "
-        "WHERE status = 'accepted' AND notes IS NOT NULL AND notes != ''"
+        "WHERE module = ? AND status = 'accepted' AND notes IS NOT NULL AND notes != ''",
+        (module,),
     ).fetchall()
 
     decisions = []

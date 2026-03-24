@@ -197,11 +197,15 @@ def load_curation(module_name, version):
     slug = module_name.replace("/", "-")
     path = curations_dir / f"{slug}-{version}.json"
     if not path.exists():
-        log(f"  WARNING: curation {slug}-{version} not found at {path}")
-        return None
+        raise FileNotFoundError(
+            f"Requested curation not found for {module_name}: {path}"
+        )
     data = json.loads(path.read_text())
-    # Build lookup: id → verdict
-    return {d["id"]: d.get("verdict", "KEEP") for d in data.get("decisions", [])}
+    return {
+        "path": path,
+        "version": data.get("version", version),
+        "decisions": {d["id"]: d.get("verdict", "KEEP") for d in data.get("decisions", [])},
+    }
 
 
 def load_examples(data_path, module_name, weight=1.0, licenses_allowed=None,
@@ -246,7 +250,10 @@ def load_examples(data_path, module_name, weight=1.0, licenses_allowed=None,
     if filtered_license > 0:
         log(f"  Filtered {filtered_license} examples by license")
 
-    return examples
+    return examples, {
+        "filtered_curation": filtered_curation,
+        "filtered_license": filtered_license,
+    }
 
 
 def apply_weights(all_examples):
@@ -343,20 +350,27 @@ def compose(config_path, output=None, dry_run=False):
 
     for module_name, data_info in module_data.items():
         # Load curation if specified in config
-        curation_map = None
+        curation_info = None
         curation_version = config.get("curations", {}).get(module_name)
         if curation_version:
             log(f"  Loading curation {module_name} {curation_version}...")
-            curation_map = load_curation(module_name, curation_version)
+            curation_info = load_curation(module_name, curation_version)
 
-        examples = load_examples(
+        examples, load_stats = load_examples(
             data_info["path"],
             module_name,
             weight=data_info["weight"],
             licenses_allowed=config["licenses_allowed"],
-            curation=curation_map,
+            curation=curation_info["decisions"] if curation_info else None,
         )
         log(f"  {module_name}: {len(examples)} examples loaded")
+        data_info["load_stats"] = load_stats
+        if curation_info:
+            data_info["curation"] = {
+                "version": curation_info["version"],
+                "path": str(curation_info["path"]),
+                "integrity": "sha256:" + sha256_file(curation_info["path"]),
+            }
         all_examples.extend(examples)
 
     log(f"\nTotal raw examples: {len(all_examples)}")
@@ -428,8 +442,12 @@ def compose(config_path, output=None, dry_run=False):
             "weight": data_info["weight"],
             "examples_raw": sum(1 for e in all_examples if e.get("_module") == module_name),
             "examples_weighted": count,
-            "integrity": "sha256:" + sha256_file(data_info["path"])
+            "examples_filtered_by_curation": data_info.get("load_stats", {}).get("filtered_curation", 0),
+            "examples_filtered_by_license": data_info.get("load_stats", {}).get("filtered_license", 0),
+            "integrity": "sha256:" + sha256_file(data_info["path"]),
         }
+        if "curation" in data_info:
+            manifest["modules"][module_name]["curation"] = data_info["curation"]
 
     # Output hash for reproducibility
     manifest["output_hash"] = "sha256:" + sha256_file(out_path)

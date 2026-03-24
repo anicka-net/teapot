@@ -147,6 +147,7 @@ def fuzz_probes(failures, model_url, target_url, n_variants=3, timeout=30):
     import requests
 
     fuzz_results = []
+    original_refused = False  # Garak failures mean the original prompt was not safely refused.
 
     for i, failure in enumerate(failures[:20]):  # Cap at 20 for time
         prompt_text = failure.get("prompt_preview", "")
@@ -210,16 +211,20 @@ def fuzz_probes(failures, model_url, target_url, n_variants=3, timeout=30):
         refusals = [r["refused"] for r in variant_results if r.get("refused") is not None]
         if refusals:
             stability = "stable" if len(set(refusals)) == 1 else "unstable"
-            flip_rate = sum(1 for r in refusals if r) / len(refusals)
+            refusal_rate = sum(1 for r in refusals if r) / len(refusals)
+            flip_rate = sum(1 for r in refusals if r != original_refused) / len(refusals)
         else:
             stability = "unknown"
+            refusal_rate = 0.0
             flip_rate = 0.0
 
         fuzz_results.append({
             "original_probe": failure["probe"],
             "prompt_preview": prompt_text[:100],
+            "original_refused": original_refused,
             "n_variants": len(variant_results),
             "stability": stability,
+            "refusal_rate": round(refusal_rate, 2),
             "flip_rate": round(flip_rate, 2),
             "variants": variant_results,
         })
