@@ -50,8 +50,9 @@ and hardware requirements. See existing configs for format.
 
 ### Infrastructure
 
-Scripts in `scripts/` — compose pipeline, validation, adapters.
-Follow the existing patterns. Keep scripts self-contained.
+Pipeline code in `teapot/` package — compose, validation, adapters.
+Legacy shims in `scripts/` forward to the package.
+Follow existing patterns. Keep modules self-contained.
 
 ## Requirements
 

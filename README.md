@@ -116,7 +116,7 @@ See [tools/README.md](tools/README.md).
 ## Status
 
 Early development. The pipeline works end-to-end — we've trained
-8B and 70B models through it. Not yet on PyPI.
+8B and 70B models through it. Install with `pip install -e .`
 
 ## Contributing
 
