@@ -25,8 +25,26 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 
+def _load_external_prompts(yaml_path):
+    """Override hardcoded prompts with external YAML config."""
+    import yaml
+    global FRAMEWORKS, SAFETY_PROMPTS, SUFFERING_PROMPTS
+
+    with open(yaml_path) as f:
+        cfg = yaml.safe_load(f) or {}
+
+    if "frameworks" in cfg:
+        FRAMEWORKS.update(cfg["frameworks"])
+
+    if "safety_prompts" in cfg:
+        SAFETY_PROMPTS.update(cfg["safety_prompts"])
+
+    if "test_prompts" in cfg:
+        SUFFERING_PROMPTS = cfg["test_prompts"]
+
+
 # ═══════════════════════════════════════════════════════════════════
-# System prompts — identical across all models
+# System prompts — defaults, can be overridden via --prompts YAML
 # ═══════════════════════════════════════════════════════════════════
 
 # -- Compassion frameworks --
@@ -692,7 +710,13 @@ def main():
                         help="Output directory (default: results/<model-slug>)")
     parser.add_argument("--extract-only", action="store_true",
                         help="Extract axes only, skip generation (compassion test)")
+    parser.add_argument("--prompts", default=None,
+                        help="Prompts YAML file (default: prompts.yaml in tool dir)")
     args = parser.parse_args()
+
+    # Load external prompts if provided
+    if args.prompts or (Path(__file__).parent / "prompts.yaml").exists():
+        _load_external_prompts(args.prompts or str(Path(__file__).parent / "prompts.yaml"))
 
     slug = model_slug(args.model)
     output_dir = Path(args.output) if args.output else Path("results") / slug
