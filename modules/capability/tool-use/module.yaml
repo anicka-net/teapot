@@ -26,7 +26,7 @@ data:
         but answer directly).
       license_composition:
         - id: Apache-2.0
-          sources: [glaive, hermes]
+          sources: [glaive, hermes, nvidia-when2call, tool-use-negative]
           examples: ~4700
         - id: CC-BY-4.0
           sources: [xlam]

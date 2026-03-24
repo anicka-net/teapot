@@ -108,6 +108,22 @@ def parse_config(config_path):
     return config
 
 
+def parse_curation_ref(ref):
+    """Parse an explicit curation reference like 'published:v1' or 'local:v1'."""
+    if ":" not in ref:
+        raise ValueError(
+            f"Ambiguous curation reference '{ref}'. "
+            "Use 'published:VERSION' or 'local:VERSION'."
+        )
+    tier, version = ref.split(":", 1)
+    if tier not in {"published", "local"} or not version:
+        raise ValueError(
+            f"Invalid curation reference '{ref}'. "
+            "Use 'published:VERSION' or 'local:VERSION'."
+        )
+    return tier, version
+
+
 def find_module(module_name):
     """Find a module's directory and YAML config."""
     # Convert safety/consequence → modules/safety/consequence/
@@ -191,27 +207,21 @@ def run_prepare(module_dir, module_name, chat_template="chatml", include_reasoni
     return None
 
 
-def load_curation(module_name, version):
+def load_curation(module_name, ref):
     """Load a curation manifest for a module.
-
-    Two-tier lookup:
-    1. Module directory: modules/{cat}/{name}/curations/{version}.json
-       (committed, shared with everyone)
-    2. Local cache: .curations/{slug}-{version}.json
-       (gitignored, local experiments)
     """
+    tier, version = parse_curation_ref(ref)
     slug = module_name.replace("/", "-")
     parts = module_name.split("/")
     module_dir = TEAPOT_ROOT / "modules" / "/".join(parts)
 
-    # Tier 1: published curations in module directory
-    candidates = [
-        module_dir / "curations" / f"{version}.json",
-        module_dir / "curations" / f"{parts[-1]}-{version}.json",
-    ]
-
-    # Tier 2: local curations
-    candidates.append(TEAPOT_ROOT / ".curations" / f"{slug}-{version}.json")
+    if tier == "published":
+        candidates = [
+            module_dir / "curations" / f"{version}.json",
+            module_dir / "curations" / f"{parts[-1]}-{version}.json",
+        ]
+    else:
+        candidates = [TEAPOT_ROOT / ".curations" / f"{slug}-{version}.json"]
 
     path = None
     for candidate in candidates:
@@ -229,7 +239,7 @@ def load_curation(module_name, version):
     return {
         "path": path,
         "version": data.get("version", version),
-        "tier": "published" if "modules/" in str(path) else "local",
+        "tier": tier,
         "decisions": {d["id"]: d.get("verdict", "KEEP") for d in data.get("decisions", [])},
     }
 
@@ -377,10 +387,10 @@ def compose(config_path, output=None, dry_run=False):
     for module_name, data_info in module_data.items():
         # Load curation if specified in config
         curation_info = None
-        curation_version = config.get("curations", {}).get(module_name)
-        if curation_version:
-            log(f"  Loading curation {module_name} {curation_version}...")
-            curation_info = load_curation(module_name, curation_version)
+        curation_ref = config.get("curations", {}).get(module_name)
+        if curation_ref:
+            log(f"  Loading curation {module_name} {curation_ref}...")
+            curation_info = load_curation(module_name, curation_ref)
 
         examples, load_stats = load_examples(
             data_info["path"],

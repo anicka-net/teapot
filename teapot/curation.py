@@ -33,6 +33,35 @@ from teapot.root import find_root
 CURATIONS_DIR = find_root() / ".curations"
 
 
+def resolve_curation_path(name, module=None):
+    """Resolve a curation from explicit ref or legacy local name."""
+    root = find_root()
+
+    if ":" in name:
+        tier, version = name.split(":", 1)
+        if tier not in {"published", "local"} or not version:
+            raise FileNotFoundError(
+                f"Invalid curation reference '{name}'. Use published:VERSION or local:VERSION."
+            )
+        if tier == "local":
+            candidates = [CURATIONS_DIR / f"{version}.json", CURATIONS_DIR / version]
+        else:
+            if not module:
+                raise FileNotFoundError(
+                    "Published curations require --module MODULE or a manifest with module metadata."
+                )
+            parts = module.split("/")
+            module_dir = root / "modules" / "/".join(parts) / "curations"
+            candidates = [module_dir / f"{version}.json", module_dir / f"{parts[-1]}-{version}.json"]
+    else:
+        candidates = [CURATIONS_DIR / f"{name}.json", CURATIONS_DIR / name]
+
+    for path in candidates:
+        if path.exists():
+            return path
+    raise FileNotFoundError(f"Curation not found: {name}")
+
+
 def create_curation(module, version, scorer, decisions, scorer_version=None,
                      notes=None, publish=False):
     """Create a curation manifest from a list of decisions.
@@ -131,31 +160,17 @@ def list_curations():
 
 def show_curation(name):
     """Show details of a curation manifest."""
-    path = CURATIONS_DIR / f"{name}.json"
-    if not path.exists():
-        # Try with .json extension already
-        path = CURATIONS_DIR / name
-    if not path.exists():
-        print(f"Curation not found: {name}")
-        print(f"Available: {', '.join(p.stem for p in CURATIONS_DIR.glob('*.json'))}")
-        sys.exit(1)
-
+    path = resolve_curation_path(name)
     data = json.loads(path.read_text())
     print(json.dumps(data, indent=2))
 
 
-def apply_curation(name, data_path, output_path, verdict_filter=None):
+def apply_curation(name, data_path, output_path, verdict_filter=None, module=None):
     """Apply a curation manifest to filter a JSONL dataset.
 
     Keeps only examples with verdicts in verdict_filter (default: KEEP*).
     """
-    path = CURATIONS_DIR / f"{name}.json"
-    if not path.exists():
-        path = CURATIONS_DIR / name
-    if not path.exists():
-        print(f"Curation not found: {name}")
-        sys.exit(1)
-
+    path = resolve_curation_path(name, module=module)
     manifest = json.loads(path.read_text())
     decisions = {d["id"]: d for d in manifest.get("decisions", [])}
 
@@ -294,6 +309,7 @@ def main():
     apply_p.add_argument("name", help="Curation name")
     apply_p.add_argument("--data", required=True, help="Input JSONL")
     apply_p.add_argument("--output", "-o", required=True, help="Output JSONL")
+    apply_p.add_argument("--module", help="Module name (required for published:VERSION)")
     apply_p.add_argument("--verdicts", default=None,
                          help="Comma-separated verdicts to keep (default: KEEP*)")
 
@@ -310,10 +326,18 @@ def main():
     elif args.command == "list":
         list_curations()
     elif args.command == "show":
-        show_curation(args.name)
+        try:
+            show_curation(args.name)
+        except FileNotFoundError as e:
+            print(str(e))
+            sys.exit(1)
     elif args.command == "apply":
         verdicts = set(args.verdicts.split(",")) if args.verdicts else None
-        apply_curation(args.name, args.data, args.output, verdicts)
+        try:
+            apply_curation(args.name, args.data, args.output, verdicts, module=args.module)
+        except FileNotFoundError as e:
+            print(str(e))
+            sys.exit(1)
     else:
         parser.print_help()
 

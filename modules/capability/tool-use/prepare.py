@@ -21,6 +21,14 @@ from pathlib import Path
 
 DEFAULT_OUTPUT = Path(__file__).parent / "data" / "tool-use.jsonl"
 
+SOURCE_LICENSES = {
+    "glaive": "Apache-2.0",
+    "hermes": "Apache-2.0",
+    "nvidia-when2call": "Apache-2.0",
+    "tool-use-negative": "Apache-2.0",
+    "xlam": "CC-BY-4.0",
+}
+
 
 def find_source(local_override=None):
     """Find the tool-use source data."""
@@ -84,15 +92,6 @@ def prepare(fmt="chatml", output=None, local=None):
     out_path = Path(output) if output else DEFAULT_OUTPUT
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Read module.yaml for license info
-    try:
-        import yaml
-        module_yaml = Path(__file__).parent / "module.yaml"
-        mod_cfg = yaml.safe_load(module_yaml.read_text())
-        license_default = mod_cfg.get("license", "Apache-2.0")
-    except Exception:
-        license_default = "Apache-2.0"
-
     count = 0
     with open(out_path, "w", encoding="utf-8") as out:
         with open(source_path) as f:
@@ -100,14 +99,15 @@ def prepare(fmt="chatml", output=None, local=None):
                 ex = json.loads(line)
                 messages = ex.get("messages", ex.get("conversations", []))
                 normalized = normalize_roles(messages, fmt)
+                source = ex.get("source", "tool-use")
 
                 record = {
                     "id": ex.get("id", f"tool-{count:05d}"),
                     "category": ex.get("category", "tool-use"),
-                    "source": ex.get("source", "tool-use"),
+                    "source": source,
                     "conversations": normalized,
                     "module": "capability/tool-use",
-                    "license": license_default,
+                    "license": SOURCE_LICENSES.get(source, "unknown"),
                 }
                 out.write(json.dumps(record, ensure_ascii=False) + "\n")
                 count += 1

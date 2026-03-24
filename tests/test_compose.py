@@ -63,7 +63,7 @@ def test_compose_exits_when_requested_curation_is_missing(tmp_path, monkeypatch)
                 "license:",
                 "  allowed: all",
                 "curations:",
-                "  safety/consequence: v1",
+                "  safety/consequence: local:v1",
                 "output:",
                 "  file: out.jsonl",
             ]
@@ -99,7 +99,7 @@ def test_compose_exits_when_requested_curation_is_missing(tmp_path, monkeypatch)
         compose_mod.compose(str(config_path), output=str(tmp_path / "out.jsonl"))
 
 
-def test_compose_manifest_records_curation_details(tmp_path, monkeypatch):
+def test_compose_rejects_ambiguous_curation_ref(tmp_path, monkeypatch):
     config_path = tmp_path / "test.config"
     config_path.write_text(
         "\n".join(
@@ -112,6 +112,45 @@ def test_compose_manifest_records_curation_details(tmp_path, monkeypatch):
                 "  allowed: all",
                 "curations:",
                 "  safety/consequence: v1",
+                "output:",
+                "  file: out.jsonl",
+            ]
+        )
+        + "\n"
+    )
+
+    data_path = tmp_path / "prepared.jsonl"
+    data_path.write_text(json.dumps({"id": "ex-1", "license": "MIT", "conversations": []}) + "\n")
+
+    module_dir = tmp_path / "module"
+    module_dir.mkdir()
+    (module_dir / "module.yaml").write_text("name: safety/consequence\n")
+
+    monkeypatch.setattr(compose_mod, "TEAPOT_ROOT", tmp_path)
+    monkeypatch.setattr(
+        compose_mod,
+        "find_module",
+        lambda module_name: (module_dir, module_dir / "module.yaml"),
+    )
+    monkeypatch.setattr(compose_mod, "run_prepare", lambda *args, **kwargs: data_path)
+
+    with pytest.raises(ValueError, match="Ambiguous curation reference"):
+        compose_mod.compose(str(config_path), output=str(tmp_path / "out.jsonl"))
+
+
+def test_compose_manifest_records_curation_details(tmp_path, monkeypatch):
+    config_path = tmp_path / "test.config"
+    config_path.write_text(
+        "\n".join(
+            [
+                "base:",
+                "  model: test/model",
+                "modules:",
+                "  safety/consequence: true",
+                "license:",
+                "  allowed: all",
+                "curations:",
+                "  safety/consequence: local:v1",
                 "output:",
                 "  file: out.jsonl",
             ]
