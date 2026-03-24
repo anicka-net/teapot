@@ -39,6 +39,9 @@ def main():
     elif command == "sources":
         from teapot.sources import main as cmd_main
         cmd_main()
+    elif command == "hardware":
+        from teapot.hardware import main as cmd_main
+        cmd_main()
     elif command == "configure":
         from teapot.configure import main as cmd_main
         cmd_main()
@@ -78,6 +81,7 @@ def print_help():
     print("  eval      CONFIG          Run evaluation pipeline")
     print("  sbom      MANIFEST        Generate SPDX 3.0 SBOM")
     print("  sources   [--list]         Show data source resolution")
+    print("  hardware  [--for CONFIG]   Detect GPUs, suggest params")
     print("  configure [CONFIG]         Interactive configuration")
     print("  fetch     --type TYPE      Fetch data sources")
     print()

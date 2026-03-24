@@ -59,8 +59,24 @@ def generate_axolotl(teapot_config, train_data, output):
 
     model_name = base.get("model", "meta-llama/Llama-3.1-8B-Instruct")
     method = base.get("method", "qlora")
-    vram = hardware.get("vram_gb", 24)
-    n_gpus = hardware.get("gpus", 1)
+
+    # Auto-detect hardware if not specified in config
+    if not hardware or (not hardware.get("vram_gb") and not hardware.get("gpus")):
+        try:
+            from teapot.hardware import detect_gpus, suggest_training_params
+            gpus = detect_gpus()
+            if gpus:
+                params = suggest_training_params(gpus, model_name, method)
+                vram = params.get("vram_per_gpu", 24)
+                n_gpus = params.get("gpus", 1)
+                print(f"Auto-detected: {n_gpus} GPU(s), {vram} GB each")
+            else:
+                vram, n_gpus = 24, 1
+        except ImportError:
+            vram, n_gpus = 24, 1
+    else:
+        vram = hardware.get("vram_gb", 24)
+        n_gpus = hardware.get("gpus", 1)
 
     micro_batch, grad_accum = estimate_batch_config(vram, n_gpus, model_name)
 
