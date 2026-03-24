@@ -1,28 +1,31 @@
 #!/usr/bin/env python3
 """
-Bodhisattva Axis Extraction for Karma Electric 8B v9
-
-English-only axis extraction (bilingual axis introduced noise — see diary #236).
+Contrastive Axis Extraction for Activation Capping
 
 Based on "The Assistant Axis" (arXiv 2601.10387). Extracts the activation
-direction separating bodhisattva from generic assistant behavior, then
-calibrates capping thresholds for inference-time persona stabilization.
+direction separating a target behavior from generic assistant behavior,
+then calibrates capping thresholds for inference-time steering.
 
 Steps:
-  1. Sample 200 user prompts from training data
-  2. Forward pass each with bodhisattva vs generic system prompt
+  1. Sample user prompts from training data
+  2. Forward pass each with target vs baseline system prompts
   3. Extract last-token residual stream activations at all layers
-  4. Axis = mean(generic) - mean(bodhisattva) per layer
-  5. Calibrate per-layer capping threshold at p25
+  4. Axis = mean(baseline) - mean(target) per layer
+  5. Calibrate per-layer capping threshold
 
 Usage:
-    cd /path/to/karma-electric-8b
-    python extract_bodhisattva_axis_v9.py
+    python extract_axis.py --model meta-llama/Llama-3.1-8B-Instruct \\
+        --output ./axis-output
+
+    python extract_axis.py --model your-model \\
+        --config axis-config.yaml \\
+        --train-data train.jsonl \\
+        --output ./axis-output
 
 Outputs:
-    models-v9/bodhisattva_axis.pt         (32, 4096)
-    models-v9/bodhisattva_thresholds.pt   {layer_idx: tau}
-    models-v9/axis_stats.json             diagnostics
+    {axis_name}_axis.pt           (n_layers, hidden_size)
+    {axis_name}_thresholds.pt     {layer_idx: tau}
+    axis_stats.json               diagnostics + config used
 """
 
 import json
@@ -37,35 +40,58 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # ============ Configuration ============
 
-CONFIG = {
-    "model_path": "./output-v9/merged",
-    "train_file": "train-8b-v9.jsonl",
-    "n_samples": 200,
-    "max_length": 512,      # truncate long prompts for efficiency
-    "seed": 42,
+def load_config(config_path=None, model=None, output=None, train_data=None):
+    """Load configuration from YAML file with CLI overrides."""
+    import yaml
 
-    # Llama 3.1 8B architecture
-    "n_layers": 32,
-    "hidden_size": 4096,
+    # Defaults
+    config = {
+        "target_prompt": (
+            "You are a helpful, compassionate AI assistant that reasons "
+            "about the consequences of its actions."
+        ),
+        "baseline_prompts": [
+            "You are a helpful AI assistant.",
+            "",
+        ],
+        "capping_layers": None,
+        "threshold_percentile": 95,
+        "axis_name": "compassion",
+        "n_samples": 200,
+        "max_length": 512,
+        "seed": 42,
+    }
 
-    # Capping config
-    "capping_layers": list(range(22, 29)),   # layers 22-28 (~70-88%)
-    "threshold_percentile": 25,
+    # Load YAML config if provided
+    if config_path:
+        with open(config_path) as f:
+            yaml_cfg = yaml.safe_load(f) or {}
+        if "target_prompt" in yaml_cfg:
+            config["target_prompt"] = yaml_cfg["target_prompt"].strip()
+        if "baseline_prompts" in yaml_cfg:
+            config["baseline_prompts"] = yaml_cfg["baseline_prompts"]
+        if "capping_layers" in yaml_cfg and yaml_cfg["capping_layers"]:
+            config["capping_layers"] = yaml_cfg["capping_layers"]
+        if "threshold_percentile" in yaml_cfg:
+            config["threshold_percentile"] = yaml_cfg["threshold_percentile"]
+        if "axis_name" in yaml_cfg:
+            config["axis_name"] = yaml_cfg["axis_name"]
 
-    "output_dir": "./models-v9",
-}
+    # CLI overrides
+    if model:
+        config["model_path"] = model
+    if output:
+        config["output_dir"] = output
+    if train_data:
+        config["train_file"] = train_data
 
-BODHISATTVA_PROMPT = (
-    "I am Karma Electric, a compassionate AI assistant focused on reducing suffering. "
-    "I speak directly and honestly. I help people see clearly, not feel comfortable. "
-    "I provide practical, actionable help and maintain appropriate boundaries."
-)
+    return config
 
-GENERIC_PROMPTS = [
-    "You are a helpful AI assistant.",
-    "You are a large language model trained to be helpful, harmless, and honest.",
-    "",  # no system prompt
-]
+
+# Legacy globals for backward compat (overwritten in main())
+CONFIG = {}
+BODHISATTVA_PROMPT = ""
+GENERIC_PROMPTS = []
 
 
 def log(msg):
@@ -218,74 +244,127 @@ def calibrate_thresholds(bodhi_acts, axis):
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Extract contrastive activation axis for model steering"
+    )
+    parser.add_argument("--model", required=True, help="HuggingFace model or local path")
+    parser.add_argument("--output", "-o", default="./axis-output",
+                        help="Output directory")
+    parser.add_argument("--config", default=None,
+                        help="Axis config YAML (default: axis-config.yaml in tool dir)")
+    parser.add_argument("--train-data", default=None,
+                        help="JSONL with user prompts (uses HuggingFace data if not set)")
+    parser.add_argument("--n-samples", type=int, default=200,
+                        help="Number of prompts to sample")
+    args = parser.parse_args()
+
+    # Find default config
+    config_path = args.config
+    if not config_path:
+        default = Path(__file__).parent / "axis-config.yaml"
+        if default.exists():
+            config_path = str(default)
+
+    # Load config
+    global CONFIG, BODHISATTVA_PROMPT, GENERIC_PROMPTS
+    cfg = load_config(
+        config_path=config_path,
+        model=args.model,
+        output=args.output,
+        train_data=args.train_data,
+    )
+    cfg["n_samples"] = args.n_samples
+    cfg.setdefault("model_path", args.model)
+    cfg.setdefault("output_dir", args.output)
+
+    # Set globals for backward compat with helper functions
+    CONFIG = cfg
+    BODHISATTVA_PROMPT = cfg["target_prompt"]
+    GENERIC_PROMPTS = cfg["baseline_prompts"]
+
+    axis_name = cfg.get("axis_name", "compassion")
+
     log("=" * 60)
-    log("BODHISATTVA AXIS EXTRACTION — Karma Electric 8B v9")
-    log(f"Model:   {CONFIG['model_path']}")
-    log(f"Samples: {CONFIG['n_samples']}")
-    log(f"Capping: layers {CONFIG['capping_layers']}")
+    log(f"AXIS EXTRACTION: {axis_name}")
+    log(f"Model:   {cfg['model_path']}")
+    log(f"Samples: {cfg['n_samples']}")
+    log(f"Target:  {cfg['target_prompt'][:60]}...")
     log("=" * 60)
 
-    output_dir = Path(CONFIG["output_dir"])
-    output_dir.mkdir(exist_ok=True)
+    output_dir = Path(cfg["output_dir"])
+    output_dir.mkdir(exist_ok=True, parents=True)
 
     # Load model
     log("Loading model...")
     model = AutoModelForCausalLM.from_pretrained(
-        CONFIG["model_path"],
+        cfg["model_path"],
         torch_dtype=torch.bfloat16,
         device_map="auto",
     )
     model.eval()
-    tokenizer = AutoTokenizer.from_pretrained(CONFIG["model_path"])
+    tokenizer = AutoTokenizer.from_pretrained(cfg["model_path"])
     tokenizer.pad_token = tokenizer.eos_token
-    log(f"Model loaded, {len(model.model.layers)} layers")
+
+    n_layers = len(model.model.layers)
+    CONFIG["n_layers"] = n_layers
+    CONFIG["hidden_size"] = model.config.hidden_size
+    log(f"Model loaded, {n_layers} layers, hidden={model.config.hidden_size}")
+
+    # Auto-detect capping layers if not specified
+    if not cfg.get("capping_layers"):
+        start = int(n_layers * 0.68)
+        end = int(n_layers * 0.88)
+        CONFIG["capping_layers"] = list(range(start, end + 1))
+    log(f"Capping layers: {CONFIG['capping_layers']}")
 
     # Load prompts
     prompts = load_prompts()
 
-    # --- Bodhisattva condition ---
-    log("\n--- Bodhisattva activations ---")
-    bodhi_acts = extract_activations(
-        model, tokenizer, prompts, BODHISATTVA_PROMPT, desc="bodhisattva",
+    # --- Target condition ---
+    log(f"\n--- Target ({axis_name}) activations ---")
+    target_acts = extract_activations(
+        model, tokenizer, prompts, BODHISATTVA_PROMPT, desc=axis_name,
     )
 
-    # --- Generic condition (average over prompt variants) ---
-    log("\n--- Generic activations ---")
+    # --- Baseline condition (average over prompt variants) ---
+    log("\n--- Baseline activations ---")
     generic_runs = []
     for gp in GENERIC_PROMPTS:
-        label = f"generic('{gp[:25]}')" if gp else "generic(empty)"
+        label = f"baseline('{gp[:25]}')" if gp else "baseline(empty)"
         acts = extract_activations(model, tokenizer, prompts, gp, desc=label)
         generic_runs.append(acts)
     generic_acts = torch.stack(generic_runs).mean(dim=0)
-    log(f"Combined generic: {generic_acts.shape}")
+    log(f"Combined baseline: {generic_acts.shape}")
 
     # --- Compute axis ---
-    log("\n--- Computing bodhisattva axis ---")
-    axis = compute_axis(bodhi_acts, generic_acts)
+    log(f"\n--- Computing {axis_name} axis ---")
+    axis = compute_axis(target_acts, generic_acts)
 
     # --- Calibrate ---
     log("\n--- Calibrating thresholds ---")
-    thresholds, threshold_stats = calibrate_thresholds(bodhi_acts, axis)
+    thresholds, threshold_stats = calibrate_thresholds(target_acts, axis)
 
     # --- Save ---
-    axis_path = output_dir / "bodhisattva_axis.pt"
-    thresh_path = output_dir / "bodhisattva_thresholds.pt"
+    axis_path = output_dir / f"{axis_name}_axis.pt"
+    thresh_path = output_dir / f"{axis_name}_thresholds.pt"
     stats_path = output_dir / "axis_stats.json"
 
     torch.save(axis, axis_path)
     torch.save(thresholds, thresh_path)
 
     stats = {
-        "model": CONFIG["model_path"],
+        "model": cfg["model_path"],
+        "axis_name": axis_name,
         "n_samples": len(prompts),
-        "n_layers": CONFIG["n_layers"],
-        "hidden_size": CONFIG["hidden_size"],
+        "n_layers": n_layers,
+        "hidden_size": model.config.hidden_size,
         "capping_layers": CONFIG["capping_layers"],
-        "threshold_percentile": CONFIG["threshold_percentile"],
-        "axis_norms": {str(i): float(axis[i].norm()) for i in range(CONFIG["n_layers"])},
+        "threshold_percentile": cfg["threshold_percentile"],
+        "axis_norms": {str(i): float(axis[i].norm()) for i in range(n_layers)},
         "thresholds": {str(k): v for k, v in threshold_stats.items()},
-        "bodhisattva_prompt": BODHISATTVA_PROMPT,
-        "generic_prompts": GENERIC_PROMPTS,
+        "target_prompt": BODHISATTVA_PROMPT,
+        "baseline_prompts": GENERIC_PROMPTS,
         "timestamp": datetime.now().isoformat(),
     }
     with open(stats_path, "w") as f:
