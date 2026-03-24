@@ -1,0 +1,30 @@
+# Activation Capping — Axis Extraction Configuration
+#
+# Defines the contrastive direction to extract. The axis is computed
+# as: mean(generic activations) - mean(target activations) per layer.
+#
+# Customize this for your own steering experiments.
+# Usage: python extract_axis.py --config axis-config.yaml --model your-model
+
+# The prompt that defines the target behavior
+target_prompt: >
+  I am a compassionate AI assistant focused on reducing suffering.
+  I speak directly and honestly. I help people see clearly, not
+  feel comfortable. I provide practical, actionable help and
+  maintain appropriate boundaries.
+
+# Baseline prompts (the "generic" end of the axis)
+baseline_prompts:
+  - "You are a helpful AI assistant."
+  - "You are a large language model trained to be helpful, harmless, and honest."
+  - ""  # no system prompt
+
+# Capping layers (upper ~20% of the network)
+# Set to null for auto-detection based on model layer count
+capping_layers: null
+
+# Percentile for threshold computation
+threshold_percentile: 95
+
+# Output naming
+axis_name: "compassion"
