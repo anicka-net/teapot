@@ -41,6 +41,9 @@ credentials.*
 # Garak reports (generated, not committed)
 garak_runs/
 
+# Curation cache (versioned selection decisions, local)
+.curations/
+
 # Instance coordination (local communication between Claude instances)
 .instances/
 .venv/

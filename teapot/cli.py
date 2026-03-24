@@ -42,6 +42,9 @@ def main():
     elif command == "hardware":
         from teapot.hardware import main as cmd_main
         cmd_main()
+    elif command == "curate":
+        from teapot.curation import main as cmd_main
+        cmd_main()
     elif command == "configure":
         from teapot.configure import main as cmd_main
         cmd_main()
@@ -80,6 +83,7 @@ def print_help():
     print("  train     CONFIG          Generate training framework config")
     print("  eval      CONFIG          Run evaluation pipeline")
     print("  sbom      MANIFEST        Generate SPDX 3.0 SBOM")
+    print("  curate    create|list|apply Curation cache management")
     print("  sources   [--list]         Show data source resolution")
     print("  hardware  [--for CONFIG]   Detect GPUs, suggest params")
     print("  configure [CONFIG]         Interactive configuration")
