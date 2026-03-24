@@ -45,3 +45,4 @@ garak_runs/
 .instances/
 .venv/
 teapot.sources.yaml
+train*.jsonl
