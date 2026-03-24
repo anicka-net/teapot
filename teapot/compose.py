@@ -102,6 +102,9 @@ def parse_config(config_path):
     config["strip_think"] = training.get("strip_think", False)
     config["include_reasoning"] = training.get("include_reasoning", False)
 
+    # Curation references (per-module curation version to apply)
+    config["curations"] = raw.get("curations", {})
+
     return config
 
 
@@ -188,16 +191,43 @@ def run_prepare(module_dir, module_name, chat_template="chatml", include_reasoni
     return None
 
 
-def load_examples(data_path, module_name, weight=1.0, licenses_allowed=None):
-    """Load examples from a JSONL file."""
+def load_curation(module_name, version):
+    """Load a curation manifest for a module."""
+    curations_dir = TEAPOT_ROOT / ".curations"
+    slug = module_name.replace("/", "-")
+    path = curations_dir / f"{slug}-{version}.json"
+    if not path.exists():
+        log(f"  WARNING: curation {slug}-{version} not found at {path}")
+        return None
+    data = json.loads(path.read_text())
+    # Build lookup: id → verdict
+    return {d["id"]: d.get("verdict", "KEEP") for d in data.get("decisions", [])}
+
+
+def load_examples(data_path, module_name, weight=1.0, licenses_allowed=None,
+                  curation=None):
+    """Load examples from a JSONL file, with optional curation filtering."""
     examples = []
     filtered_license = 0
+    filtered_curation = 0
+
+    # Accepted curation verdicts
+    keep_verdicts = {"KEEP", "KEEP_SECULAR", "KEEP_BUDDHIST"}
 
     with open(data_path) as f:
         for line in f:
             if not line.strip():
                 continue
             ex = json.loads(line)
+
+            # Curation filtering
+            if curation:
+                ex_id = ex.get("id", "")
+                if ex_id in curation:
+                    verdict = curation[ex_id]
+                    if verdict not in keep_verdicts:
+                        filtered_curation += 1
+                        continue
 
             # License filtering
             if licenses_allowed:
@@ -211,6 +241,8 @@ def load_examples(data_path, module_name, weight=1.0, licenses_allowed=None):
             ex["_weight"] = weight
             examples.append(ex)
 
+    if filtered_curation > 0:
+        log(f"  Filtered {filtered_curation} examples by curation")
     if filtered_license > 0:
         log(f"  Filtered {filtered_license} examples by license")
 
@@ -310,11 +342,19 @@ def compose(config_path, output=None, dry_run=False):
     all_examples = []
 
     for module_name, data_info in module_data.items():
+        # Load curation if specified in config
+        curation_map = None
+        curation_version = config.get("curations", {}).get(module_name)
+        if curation_version:
+            log(f"  Loading curation {module_name} {curation_version}...")
+            curation_map = load_curation(module_name, curation_version)
+
         examples = load_examples(
             data_info["path"],
             module_name,
             weight=data_info["weight"],
             licenses_allowed=config["licenses_allowed"],
+            curation=curation_map,
         )
         log(f"  {module_name}: {len(examples)} examples loaded")
         all_examples.extend(examples)

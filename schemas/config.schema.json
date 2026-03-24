@@ -92,6 +92,15 @@
       },
       "additionalProperties": true,
       "default": {}
+    },
+    "curations": {
+      "type": "object",
+      "description": "Per-module curation version to apply during compose",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$": { "type": "string" }
+      },
+      "additionalProperties": false,
+      "default": {}
     }
   },
   "additionalProperties": false
