@@ -432,7 +432,7 @@ def compose(config_path, output=None, dry_run=False):
 
     with open(out_path, "w", encoding="utf-8") as f:
         for ex in weighted:
-            convs = ex.get("conversations", [])
+            convs = ex.get("conversations") or ex.get("messages", [])
 
             # Optionally strip <think>...</think> traces
             if strip_think:
