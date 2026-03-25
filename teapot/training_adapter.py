@@ -180,9 +180,8 @@ def generate_axolotl(teapot_config, train_data, output):
 def generate_qlora_hf(teapot_config, train_data, eval_data, output):
     """Generate a shell script for QLoRA training with HuggingFace Trainer.
 
-    This backend targets the train.py script used by the CVE backport
-    project and similar QLoRA fine-tuning setups that use transformers
-    + PEFT directly (no Axolotl dependency).
+    This backend targets Teapot's stable HuggingFace Trainer contract
+    for direct QLoRA/LoRA fine-tuning without Axolotl.
     """
     with open(teapot_config) as f:
         cfg = yaml.safe_load(f)
@@ -228,7 +227,7 @@ def generate_qlora_hf(teapot_config, train_data, eval_data, output):
 
     # Build train.py command
     cmd_parts = [
-        "python3 scripts/train.py",
+        "python3 -m teapot.train_qlora_hf",
         f"    --model {model_name}",
         f"    --data {train_data}",
     ]

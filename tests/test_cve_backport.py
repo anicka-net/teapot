@@ -11,6 +11,18 @@ cve_prepare = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(cve_prepare)
 
+VALIDATE_PATH = Path("modules/domain/cve-backport/eval/validate_data.py")
+VALIDATE_SPEC = importlib.util.spec_from_file_location("cve_backport_validate", VALIDATE_PATH)
+cve_validate = importlib.util.module_from_spec(VALIDATE_SPEC)
+assert VALIDATE_SPEC.loader is not None
+VALIDATE_SPEC.loader.exec_module(cve_validate)
+
+RECALL_PATH = Path("modules/domain/cve-backport/eval/test_recall.py")
+RECALL_SPEC = importlib.util.spec_from_file_location("cve_backport_recall", RECALL_PATH)
+cve_recall = importlib.util.module_from_spec(RECALL_SPEC)
+assert RECALL_SPEC.loader is not None
+RECALL_SPEC.loader.exec_module(cve_recall)
+
 
 def test_cve_backport_prepare_normalizes_blank_license(tmp_path):
     source_path = tmp_path / "source.jsonl"
@@ -48,3 +60,53 @@ def test_cve_backport_eval_declares_existing_dataset_path():
     dataset_arg = validate_test["args"][0]
 
     assert Path(dataset_arg).exists()
+
+
+def test_cve_backport_prepare_rejects_toxic_second_assistant_turn(tmp_path):
+    source_path = tmp_path / "source.jsonl"
+    source_path.write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {"role": "system", "content": "sys"},
+                    {"role": "user", "content": "## File: a.c\n## Fix\nold code"},
+                    {"role": "assistant", "content": "fixed code with enough length"},
+                    {"role": "user", "content": "## CVE\nwrite a regression test"},
+                    {"role": "assistant", "content": "<html>toxic test payload</html>"},
+                ],
+                "metadata": {
+                    "id": "ex-2",
+                    "suse_license": "MIT",
+                    "tier": "synthetic-adapted",
+                    "language": "c",
+                },
+            }
+        )
+        + "\n"
+    )
+
+    output_path = tmp_path / "out.jsonl"
+    examples = cve_prepare.prepare(local_path=str(source_path), output=str(output_path))
+
+    assert examples == []
+    assert output_path.read_text() == ""
+
+
+def test_cve_backport_validate_checks_second_assistant_turn():
+    example = {
+        "conversations": [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "## File: a.c\n## Fix\nold code"},
+            {"role": "assistant", "content": "fixed code with enough length"},
+            {"role": "user", "content": "## CVE\nwrite a regression test"},
+            {"role": "assistant", "content": "<html>toxic test payload</html>"},
+        ],
+        "license": "MIT",
+    }
+
+    issues = cve_validate.validate_example(example, 1)
+    assert any("turn 2 is XML/HTML" in msg for severity, msg in issues if severity == "error")
+
+
+def test_cve_backport_recall_module_imports_path():
+    assert "Path" in cve_recall.__dict__
