@@ -1,0 +1,16 @@
+{%- for message in messages -%}
+{%- if message.role == "system" -%}
+<|system_start|>{{ message.content }}<|system_end|>
+<|developer_start|>Deliberation: enabled
+Tool Capabilities: disabled<|developer_end|>
+{%- elif message.role == "user" -%}
+<|user_start|>{{ message.content }}<|user_end|>
+{%- elif message.role == "assistant" -%}
+<|assistant_start|>{{ message.content }}<|assistant_end|>
+{%- elif message.role == "ipython" or message.role == "tool" -%}
+<|user_start|>[Tool result]: {{ message.content }}<|user_end|>
+{%- endif -%}
+{%- endfor -%}
+{%- if add_generation_prompt -%}
+<|assistant_start|>
+{%- endif -%}
