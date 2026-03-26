@@ -304,6 +304,8 @@ def generate_full_hf(teapot_config, train_data, output):
     max_length = training.get("max_length", 4096)
     chat_template = training.get("chat_template", "apertus-think")
     warmup = training.get("warmup_ratio", 0.05)
+    config_stem = Path(teapot_config).stem
+    output_dir = f"output-teapot-{config_stem}"
 
     from teapot.root import find_root
     ds_config = str(find_root() / "deepspeed_configs" / "zero3-offload.json")
@@ -317,7 +319,7 @@ def generate_full_hf(teapot_config, train_data, output):
         f"deepspeed --num_gpus {n_gpus} -m teapot.train_full_hf \\",
         f"  --model {model_name} \\",
         f"  --data {train_data} \\",
-        f"  --output output-full-$(date +%Y%m%d) \\",
+        f"  --output {output_dir} \\",
         f"  --deepspeed {ds_config} \\",
         f"  --epochs {epochs} \\",
         f"  --lr {lr} \\",
@@ -340,6 +342,7 @@ def generate_full_hf(teapot_config, train_data, output):
     print(f"  DeepSpeed: ZeRO-3 + CPU offload")
     print(f"  Epochs: {epochs}, LR: {lr}")
     print(f"  Template: {chat_template}")
+    print(f"  Output dir: {output_dir}")
     print(f"\nRun: bash {output}")
 
 

@@ -20,9 +20,9 @@ Or via teapot:
 import argparse
 import json
 import sys
-from pathlib import Path
 
 import torch
+from teapot.templates import TEMPLATES, format_conversation
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -62,7 +62,6 @@ class FormattedDataset(Dataset):
                     # Fallback: apply template at load time
                     convs = ex.get("conversations", ex.get("messages", []))
                     if template:
-                        from teapot.templates import format_conversation
                         text, spans = format_conversation(convs, template, thinking=True)
                         if text is None:
                             # Template returned None — skip
@@ -140,32 +139,38 @@ def collate_fn(batch):
     }
 
 
-def verify_special_tokens(tokenizer):
-    """Verify that Apertus special tokens tokenize as single IDs."""
-    critical = {
-        "<|system_start|>": 61,
-        "<|system_end|>": 62,
-        "<|user_start|>": 65,
-        "<|user_end|>": 66,
-        "<|assistant_start|>": 67,
-        "<|assistant_end|>": 68,
-        "<|inner_prefix|>": 69,
-        "<|inner_suffix|>": 70,
-    }
+def verify_special_tokens(tokenizer, template):
+    """Verify Teapot-owned template control tokens are registered as single special tokens."""
+    if not template or template == "auto":
+        return True
 
+    template_meta = TEMPLATES.get(template)
+    if not template_meta:
+        return True
+
+    critical = template_meta.get("special_tokens", [])
+    if not critical:
+        return True
+
+    all_special_tokens = set(getattr(tokenizer, "all_special_tokens", []))
     ok = True
-    for token, expected_id in critical.items():
+
+    for token in critical:
         ids = tokenizer.encode(token, add_special_tokens=False)
-        if ids != [expected_id]:
-            print(f"WARNING: {token} encodes as {ids}, expected [{expected_id}]")
+        is_special = token in all_special_tokens
+        if len(ids) != 1 or not is_special:
+            print(
+                f"ERROR: {token} encodes as {ids} and "
+                f"{'is not' if not is_special else 'is'} registered as a special token"
+            )
             ok = False
         else:
-            print(f"  OK: {token} → [{expected_id}]")
+            print(f"  OK: {token} → {ids}")
 
     if not ok:
-        print("\nWARNING: Special tokens not recognized. The model may learn")
-        print("to generate them as text instead of control tokens.")
-        print("Check tokenizer_config.json and added_tokens.json.")
+        print("\nERROR: Template control tokens are not configured safely.")
+        print("Refusing to start full fine-tuning with a broken chat format.")
+        print("Check tokenizer_config.json / added_tokens.json for this model.")
 
     return ok
 
@@ -205,8 +210,9 @@ def main():
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    print("\nVerifying special tokens:")
-    verify_special_tokens(tokenizer)
+    print(f"\nVerifying template tokens for: {args.template or 'none'}")
+    if not verify_special_tokens(tokenizer, args.template):
+        sys.exit(1)
 
     # Load model in bf16 (no quantization)
     print("\nLoading model in bf16...")
