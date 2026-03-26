@@ -16,7 +16,7 @@ HuggingFace datasets and training frameworks. You declare modules
 eval criteria) in YAML. The system handles format harmonization
 (chat templates, role mapping), license-based filtering (every
 example tagged), weighted mixing, deduplication, and deterministic
-output. Training backend is pluggable (Axolotl, TRL, unsloth).
+output. Training backend is pluggable (Axolotl, HF Trainer, Unsloth).
 Evaluation runs tiered gates from fast CI checks to full red-team
 sweeps (Garak, Bloom, MLCommons AILuminate). SBOM generation
 follows SPDX 3.0 AI Profile.
@@ -442,7 +442,7 @@ configs/
 llm configure              # interactive menu (or: llm configure --load configs/defconfig)
 llm prepare                 # download + convert all enabled module data
 llm compose                 # merge into training JSONL with weights + license filter
-llm train                   # run training (calls Axolotl/TRL/unsloth underneath)
+llm train                   # run training (calls Axolotl/HF/Unsloth underneath)
 llm eval                    # run all enabled module evaluations
 llm sbom                    # generate SBOM from config + module metadata
 llm package                 # produce final artifacts (GGUF, model card, SBOM)
@@ -455,8 +455,9 @@ This is where the value lives. `llm compose`:
 1. For each enabled module, run its `prepare.py` → canonical JSONL
 2. Apply license filter: drop examples not matching `license.allowed`
 3. Apply per-module weights: sample/repeat to achieve target ratios
-4. Harmonize format: ensure all examples use the same chat template
-   (system/user/assistant with correct role names for the base model)
+4. Harmonize format: apply any Teapot-owned chat template during
+   compose and emit formatted `text` plus `assistant_spans`; leave
+   `chat_template: auto` examples as canonical conversations
 5. Deduplicate across modules (if examples appear in multiple)
 6. Shuffle with deterministic seed
 7. Output: `train.jsonl` + `compose-manifest.json` (what went in)
@@ -667,10 +668,12 @@ SBOM is generated FROM this, in whatever format (SPDX, CycloneDX,
 plain JSON). The manifest is the truth; the SBOM is a view.
 
 **3. Training Bundle**: `train.jsonl` + a framework config file.
-The compose step outputs generic JSONL. A thin adapter generates
-the config for whatever training framework is in use. Switching
-from Axolotl to TRL to unsloth means writing a new adapter (~100
-lines), not redesigning the system.
+The compose step outputs the reviewed training artifact. For
+Teapot-owned templates that artifact includes formatted `text` plus
+`assistant_spans`; for `auto`, it remains canonical conversations.
+A thin adapter generates the config or launch script for whatever
+training framework is in use. Switching from Axolotl to HF Trainer
+to Unsloth means writing a new adapter, not redesigning the system.
 
 **4. Eval Report**: `eval.json` — structured results with pass/fail.
 Any eval tool that can return JSON with scores and a pass/fail

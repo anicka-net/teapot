@@ -100,20 +100,23 @@ configure → compose → lock → validate → train → eval → sbom
 
 | Backend | Command | Use case |
 |---------|---------|----------|
-| Unsloth | `--backend unsloth` | Fast QLoRA, 2-4x speedup, single GPU |
+| Unsloth | `--backend unsloth` | Fast QLoRA/LoRA/full with preflight hardware checks |
 | HF QLoRA | `--backend qlora-hf` | Standard QLoRA via HF Trainer |
 | HF Full | `--backend full-hf` | Full fine-tune, DeepSpeed ZeRO-3 |
 | Axolotl | `--backend axolotl` | Feature-rich, YAML config |
 
 ## Chat Templates
 
-Teapot applies chat templates at compose time, ensuring training
-data matches the model's native token format. Templates verified
-before training starts — mismatched special tokens fail fast.
+Teapot applies owned chat templates at compose time, ensuring the
+training artifact itself matches the model's native token format.
+Formatted examples include `text` plus `assistant_spans`, and
+training backends consume that bundle without re-templating.
+Templates are verified before training starts; mismatched special
+tokens fail fast.
 
 | Template | Model | Tokens |
 |----------|-------|--------|
-| `auto` | Any | Pass through, framework handles it |
+| `auto` | Any | Preserve canonical conversations, let backend format |
 | `apertus-think` | Apertus | Native tokens + `<\|inner_prefix\|>` deliberation |
 | `apertus-full` | Apertus | Native + deliberation + tools |
 | `chatml` | Mistral, etc. | `<\|im_start\|>` / `<\|im_end\|>` |
@@ -146,7 +149,8 @@ teapot curate create --module safety/consequence --version v1 \
 ```
 
 Published curations ship with the module. Local curations are
-gitignored experiments. Compose applies curations automatically.
+gitignored experiments. Compose applies curations only when the
+config names an explicit ref like `published:v1` or `local:v1`.
 
 ## Tools
 
