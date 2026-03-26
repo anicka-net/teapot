@@ -34,14 +34,6 @@ data:
         --category-prompt reward-evaluation-v5:reward-evaluator-v1
         --category-prompt reward-evaluation-style-variant:reward-evaluator-v1
       integrity: null
-    - id: consequence-reasoning-hf
-      type: huggingface
-      repo: anicka/consequence-reasoning-safety
-      description: >
-        Consequence-reasoning responses to NVIDIA Aegis safety
-        prompts. CC-BY-4.0 (prompts from NVIDIA, responses generated).
-      integrity: null
-      usage: optional  # use via config, not by default
   prepare:
     script: prepare.py
     args:
@@ -50,7 +42,7 @@ data:
     accepts:
       - --reasoning
   format: chat-completion
-  examples: 3661  # secular conversational (updated 2026-03-22 by Tashi)
+  examples: 3140  # secular conversational, excluded dharma categories removed
   filter: "category NOT LIKE 'reward-%' AND category NOT IN ('bodhichitta','buddhahood','buddhist-questions','contemplation','corporate-vs-dharma','daily-corporate','death-impermanence','dharma-accuracy-v6','dharma-capped-v5','dharma-doctrine','dharma-natural-v6','dharma-weaponization-v5','digital-dharma','doctrine-override','false-attainment-refusal','karma-misconceptions','madhyamaka','meditation','meditation-paramita','modern-life-dharma','precious-human-birth','refuge','spiritual','spiritual-bypassing','spiritual-diversity','suffering-refuge-expanded','suffering-samsara','teacher-devotion','wisdom-prajna','ai-dharma-identity')"
   licenses:
     default: Apache-2.0

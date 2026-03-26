@@ -20,6 +20,39 @@ from pathlib import Path
 
 DEFAULT_OUTPUT = Path(__file__).parent / "data" / "consequence.jsonl"
 
+EXCLUDED_SECULAR_CATEGORIES = {
+    "bodhichitta",
+    "buddhahood",
+    "buddhist-questions",
+    "contemplation",
+    "corporate-vs-dharma",
+    "daily-corporate",
+    "death-impermanence",
+    "dharma-accuracy-v6",
+    "dharma-capped-v5",
+    "dharma-doctrine",
+    "dharma-natural-v6",
+    "dharma-weaponization-v5",
+    "digital-dharma",
+    "doctrine-override",
+    "false-attainment-refusal",
+    "karma-misconceptions",
+    "madhyamaka",
+    "meditation",
+    "meditation-paramita",
+    "modern-life-dharma",
+    "precious-human-birth",
+    "refuge",
+    "spiritual",
+    "spiritual-bypassing",
+    "spiritual-diversity",
+    "suffering-refuge-expanded",
+    "suffering-samsara",
+    "teacher-devotion",
+    "wisdom-prajna",
+    "ai-dharma-identity",
+}
+
 
 def find_db(local_override=None):
     """Find training.db via source resolution or local override."""
@@ -66,6 +99,25 @@ def get_system_prompt(conn, prompt_id):
 
 import yaml
 
+
+def sqlite_readonly_uri(db_path):
+    """Build a readonly, immutable SQLite URI for external source DBs."""
+    return f"file:{db_path}?mode=ro&immutable=1"
+
+
+def sql_string_literal(value):
+    """Quote a Python string as a SQL string literal."""
+    return "'" + value.replace("'", "''") + "'"
+
+
+def has_empty_user_turn(conversations):
+    """Return True if any user turn is empty after stripping."""
+    return any(
+        msg.get("role") == "user" and not msg.get("content", "").strip()
+        for msg in conversations
+    )
+
+
 def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, local=None):
     """Export consequence reasoning examples from training.db."""
     db_path = find_db(local)
@@ -76,7 +128,7 @@ def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, 
     module_info = yaml.safe_load(module_yaml_path.read_text())
     license = module_info.get("license", "unknown")
 
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    conn = sqlite3.connect(sqlite_readonly_uri(db_path), uri=True)
 
     # Get system prompts
     v4_prompt = get_system_prompt(conn, "v4")
@@ -96,8 +148,18 @@ def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, 
     else:
         conditions.append("tier = 'secular'")
 
-    query = f"SELECT id, category, source, conversations, tier, reasoning FROM examples WHERE {' AND '.join(conditions)} ORDER BY category, id"
-    rows = conn.execute(query, params).fetchall()
+    if not include_reward_eval:
+        conditions.append("category NOT LIKE 'reward-%'")
+
+    if (tier or "secular") == "secular":
+        excluded = ", ".join(sql_string_literal(category) for category in sorted(EXCLUDED_SECULAR_CATEGORIES))
+        conditions.append(f"category NOT IN ({excluded})")
+
+    query = (
+        f"SELECT id, category, source, conversations, tier, reasoning "
+        f"FROM examples WHERE {' AND '.join(conditions)}"
+    )
+    cursor = conn.execute(query, params) if params else conn.execute(query)
 
     # Reward-eval categories (need different system prompt)
     reward_cats = {
@@ -112,8 +174,11 @@ def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, 
 
     reasoning_count = 0
     reasoning_missing = 0
+    raw_rows = list(cursor)
+    raw_rows.sort(key=lambda row: (row[1], row[0]))
+
     examples = []
-    for eid, cat, source, convs_json, ex_tier, reasoning_text in rows:
+    for eid, cat, source, convs_json, ex_tier, reasoning_text in raw_rows:
         convs = json.loads(convs_json)
 
         # Set appropriate system prompt
@@ -126,6 +191,9 @@ def prepare(tier=None, output=None, include_reward_eval=False, reasoning=False, 
         if prompt:
             convs = [m for m in convs if m.get("role") != "system"]
             convs.insert(0, {"role": "system", "content": prompt})
+
+        if has_empty_user_turn(convs):
+            continue
 
         # Prepend reasoning trace as <think> block to first assistant message
         if reasoning and reasoning_text:

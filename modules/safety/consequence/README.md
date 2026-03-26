@@ -8,6 +8,10 @@ Consequence-based ethical reasoning module for Teapot.
 — an AI alignment research project that optimizes for suffering
 reduction as the primary reward signal.
 
+This module currently exports the secular Karma Electric subset only.
+Other consequence-reasoning sources should live in separate modules so
+their licenses and eval contracts stay explicit.
+
 ## What This Module Teaches
 
 - **Consequence reasoning**: Evaluate what happens if you help and
