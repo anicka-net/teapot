@@ -24,7 +24,8 @@ provides:
 
 data:
   sources:
-    - type: sqlite
+    - id: ke-training-db
+      type: sqlite
       path: data/training.db
       export_script: scripts/training_db.py
       export_args: >
@@ -32,8 +33,15 @@ data:
         --category-prompt reward-evaluation:reward-evaluator-v1
         --category-prompt reward-evaluation-v5:reward-evaluator-v1
         --category-prompt reward-evaluation-style-variant:reward-evaluator-v1
-      # integrity populated by teapot prepare, verified on compose
       integrity: null
+    - id: consequence-reasoning-hf
+      type: huggingface
+      repo: anicka/consequence-reasoning-safety
+      description: >
+        Consequence-reasoning responses to NVIDIA Aegis safety
+        prompts. CC-BY-4.0 (prompts from NVIDIA, responses generated).
+      integrity: null
+      usage: optional  # use via config, not by default
   prepare:
     script: prepare.py
     args:
