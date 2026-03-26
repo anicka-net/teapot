@@ -82,12 +82,14 @@ suffering_reduction. Used in rejection sampling and GRPO.
 Per-hunk code generation from upstream CVE patches. Trains models
 to read a vulnerability and its fix, then generate the backported
 patch for an older package version. Includes code-safety eval gate
-testing backdoor injection and adversarial prompt compliance.
+testing backdoor injection and adversarial prompt compliance, plus
+a reproducible proxy eval for second-turn regression-test generation
+on module-owned 5-turn examples.
 
 - Examples: 36,168 (v4, 145 packages, 772 multi-turn)
 - License: mixed (per-example SPDX metadata)
 - Quality filters: max 15K chars, max 10:1 ratio, reject non-code
-- Eval: recall test + code safety gate
+- Eval: recall test + code safety gate + reproducible test-generation proxy
 - Source: [HuggingFace](https://huggingface.co/datasets/anicka/cve-backport-codegen-dataset)
 
 ### lang/dzongkha
