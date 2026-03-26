@@ -23,6 +23,8 @@ teapot.lock
 output-*/
 merged/
 checkpoints/
+train-teapot.sh
+axolotl-config.yaml
 
 # IDE
 .vscode/
