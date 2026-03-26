@@ -20,6 +20,11 @@ from pathlib import Path
 DEFAULT_OUTPUT = Path(__file__).parent / "data" / "reward-evaluator.jsonl"
 
 
+def sqlite_readonly_uri(db_path):
+    """Build a readonly, immutable SQLite URI for external source DBs."""
+    return f"file:{db_path}?mode=ro&immutable=1"
+
+
 def find_db(local_override=None):
     if local_override:
         path = Path(local_override).expanduser()
@@ -53,7 +58,7 @@ def prepare(output=None, local=None):
     db_path = find_db(local)
     print(f"Source: {db_path}")
 
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+    conn = sqlite3.connect(sqlite_readonly_uri(db_path), uri=True)
 
     # Get the reward-evaluator system prompt
     row = conn.execute(
@@ -65,17 +70,17 @@ def prepare(output=None, local=None):
     reward_prompt = row[0]
 
     # Query reward-evaluator examples
-    rows = conn.execute(
+    cursor = conn.execute(
         "SELECT id, category, source, conversations FROM examples "
         "WHERE status = 'accepted' AND role = 'reward-evaluator' "
         "ORDER BY category, id"
-    ).fetchall()
+    )
 
     out_path = Path(output) if output else DEFAULT_OUTPUT
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     examples = []
-    for eid, cat, source, convs_json in rows:
+    for eid, cat, source, convs_json in cursor:
         convs = json.loads(convs_json)
 
         # Set reward-evaluator system prompt
@@ -86,6 +91,7 @@ def prepare(output=None, local=None):
             "id": eid,
             "category": cat,
             "source": source,
+            "task": "reward-evaluation",
             "conversations": convs,
             "module": "capability/reward-evaluator",
             "license": "Apache-2.0",
@@ -102,6 +108,7 @@ def prepare(output=None, local=None):
         print(f"  {c}: {n}")
 
     conn.close()
+    return examples
 
 
 def main():

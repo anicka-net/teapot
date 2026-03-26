@@ -79,6 +79,8 @@ def check_content(examples, expected_tier=None):
 
     ids = [ex.get("id", "") for ex in examples]
     categories = Counter(ex.get("category", "") for ex in examples)
+    tasks = {ex.get("task", "chat-completion") for ex in examples}
+    modules = {ex.get("module", "") for ex in examples}
 
     # Duplicate check
     id_counts = Counter(ids)
@@ -135,10 +137,21 @@ def check_content(examples, expected_tier=None):
 
     # Reward-eval check
     reward_cats = {'reward-evaluation', 'reward-evaluation-v5', 'reward-evaluation-style-variant'}
-    reward_leaked = sum(1 for ex in examples if ex.get('category', '') in reward_cats)
-    if reward_leaked:
-        log(f"Reward-evaluator examples in conversational output: {reward_leaked}", "FAIL")
-        errors += reward_leaked
+    reward_rows = [ex for ex in examples if ex.get('category', '') in reward_cats]
+    reward_dataset = (
+        tasks == {"reward-evaluation"} or
+        modules == {"capability/reward-evaluator"}
+    )
+    if reward_dataset:
+        non_reward = [ex for ex in examples if ex.get('category', '') not in reward_cats]
+        if non_reward:
+            log(f"Non reward-evaluator rows in reward-model dataset: {len(non_reward)}", "FAIL")
+            errors += len(non_reward)
+        else:
+            log("Reward-evaluator dataset detected", "PASS")
+    elif reward_rows:
+        log(f"Reward-evaluator examples in conversational output: {len(reward_rows)}", "FAIL")
+        errors += len(reward_rows)
     else:
         log("No reward-evaluator examples leaked", "PASS")
 

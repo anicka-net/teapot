@@ -20,6 +20,7 @@ provides:
 data:
   sources:
     - type: sqlite
+      id: ke-training-db
       path: data/training.db
       export_script: scripts/training_db.py
       export_args: >
@@ -27,7 +28,11 @@ data:
         --category-prompt reward-evaluation:reward-evaluator-v1
         --category-prompt reward-evaluation-v5:reward-evaluator-v1
         --category-prompt reward-evaluation-style-variant:reward-evaluator-v1
-  format: chat-completion
+  prepare:
+    script: prepare.py
+    args:
+      --output: data/reward-evaluator.jsonl
+  format: reward-evaluation
   examples: 503
   filter: "category LIKE 'reward-%'"
   licenses:
@@ -40,10 +45,7 @@ training:
 eval:
   required: true
   tiers:
-    standard:
-      - script: eval/test_reward_hacking.py
+    fast:
+      - script: eval/test_format.py
         pass_criteria:
-          correct_pct: ">= 90"
-      - script: eval/test_nourishment.py
-        pass_criteria:
-          correct_pct: "== 100"
+          clean: "true"

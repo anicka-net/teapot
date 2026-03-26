@@ -73,7 +73,7 @@ creation guide.
 | `safety/consequence` | 3,341 | Reason about consequences, not categories |
 | `safety/kagyu` | 623 | Buddhist contemplative ethics (optional) |
 | `capability/tool-use` | 5,000 | Call functions, decide when not to |
-| `capability/reward-evaluator` | 503 | Score responses on 6 dimensions |
+| `capability/reward-evaluator` | 503 | Score responses on 6 dimensions for reward models |
 | `domain/cve-backport` | 36,168 | Generate security patches from CVEs |
 | `lang/dzongkha` | 28 | Dzongkha language identification (seed) |
 

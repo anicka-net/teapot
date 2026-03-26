@@ -70,6 +70,7 @@ decision-making and negative examples.
 Trains the model as a reward evaluator scoring: acknowledgment,
 helpfulness, authenticity, boundaries, consequence_awareness,
 suffering_reduction. Used in rejection sampling and GRPO.
+This is a reward-model dataset, not a normal conversational SFT module.
 
 - Examples: 503
 - License: Apache-2.0
