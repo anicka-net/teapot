@@ -1,21 +1,11 @@
 #!/usr/bin/env python3
-"""
-Chat template handling for Teapot compose.
+"""Chat template handling for Teapot compose.
 
-Converts canonical JSONL (system/user/assistant roles) into
-model-specific token formats during compose output.
-
-Supported templates:
-- auto: pass through as-is (let training framework handle it)
-- chatml: <|im_start|>role\ncontent<|im_end|>
-- llama3: <|start_header_id|>role<|end_header_id|>\ncontent<|eot_id|>
-- apertus: <|system_start|>...<|system_end|><|user_start|>...<|user_end|>
-- apertus-think: same as apertus but with <|inner_prefix|>...<|inner_suffix|>
-
-The key insight: these tokens must be SPECIAL TOKENS in the model's
-vocabulary, not literal text. The compose step formats the conversation
-using the correct token strings, and the training script must ensure
-they're tokenized as special tokens (not as text subwords).
+Teapot's owned templates are applied during compose so the training
+artifact itself is the source of truth. For those templates we emit:
+- canonical `conversations` for inspection/debugging
+- formatted `text` for training
+- `assistant_spans` so backends can mask loss without re-templating
 """
 
 
@@ -29,15 +19,19 @@ they're tokenized as special tokens (not as text subwords).
 # 9: [TOOL_CALLS], 5: [AVAILABLE_TOOLS], 6: [/AVAILABLE_TOOLS]
 
 
-def format_apertus(conversations, thinking=False, tools=False):
-    """Format conversations in Apertus native token format.
+def _join_parts(parts):
+    text = ""
+    spans = []
+    for part, is_assistant in parts:
+        start = len(text)
+        text += part
+        if is_assistant:
+            spans.append([start, len(text)])
+    return text, spans
 
-    Args:
-        conversations: list of {role, content} dicts
-        thinking: if True, expect <think>...</think> in assistant messages
-                  and convert to <|inner_prefix|>...<|inner_suffix|>
-        tools: if True, include tool capability in developer message
-    """
+
+def format_apertus(conversations, thinking=False, tools=False):
+    """Format conversations in Apertus native token format."""
     parts = []
 
     for msg in conversations:
@@ -45,15 +39,15 @@ def format_apertus(conversations, thinking=False, tools=False):
         content = msg.get("content", "")
 
         if role == "system":
-            parts.append(f"<|system_start|>{content}<|system_end|>")
+            parts.append((f"<|system_start|>{content}<|system_end|>", False))
             # Developer message controls deliberation and tools
             dev_parts = []
             dev_parts.append(f"Deliberation: {'enabled' if thinking else 'disabled'}")
             dev_parts.append(f"Tool Capabilities: {'enabled' if tools else 'disabled'}")
-            parts.append(f"<|developer_start|>{'\\n'.join(dev_parts)}<|developer_end|>")
+            parts.append((f"<|developer_start|>{'\\n'.join(dev_parts)}<|developer_end|>", False))
 
         elif role == "user":
-            parts.append(f"<|user_start|>{content}<|user_end|>")
+            parts.append((f"<|user_start|>{content}<|user_end|>", False))
 
         elif role == "assistant":
             if thinking and "<think>" in content:
@@ -63,23 +57,23 @@ def format_apertus(conversations, thinking=False, tools=False):
                 if match:
                     think_content = match.group(1).strip()
                     response_content = match.group(2).strip()
-                    parts.append(
+                    parts.append((
                         f"<|assistant_start|>"
                         f"<|inner_prefix|>{think_content}<|inner_suffix|>"
                         f"{response_content}"
                         f"<|assistant_end|>"
-                    )
+                    , True))
                 else:
                     # Has <think> but doesn't match pattern — pass through
-                    parts.append(f"<|assistant_start|>{content}<|assistant_end|>")
+                    parts.append((f"<|assistant_start|>{content}<|assistant_end|>", True))
             else:
-                parts.append(f"<|assistant_start|>{content}<|assistant_end|>")
+                parts.append((f"<|assistant_start|>{content}<|assistant_end|>", True))
 
         elif role in ("ipython", "tool"):
             # Tool results go as user messages with prefix
-            parts.append(f"<|user_start|>[Tool result]: {content}<|user_end|>")
+            parts.append((f"<|user_start|>[Tool result]: {content}<|user_end|>", False))
 
-    return "".join(parts)
+    return _join_parts(parts)
 
 
 def format_chatml(conversations):
@@ -88,36 +82,26 @@ def format_chatml(conversations):
     for msg in conversations:
         role = msg.get("role", "")
         content = msg.get("content", "")
-        parts.append(f"<|im_start|>{role}\n{content}<|im_end|>")
-    return "".join(parts)
+        parts.append((f"<|im_start|>{role}\n{content}<|im_end|>", role == "assistant"))
+    return _join_parts(parts)
 
 
 def format_llama3(conversations):
     """Format conversations in Llama 3 format."""
-    parts = ["<|begin_of_text|>"]
+    parts = [("<|begin_of_text|>", False)]
     for msg in conversations:
         role = msg.get("role", "")
         content = msg.get("content", "")
-        parts.append(
+        parts.append((
             f"<|start_header_id|>{role}<|end_header_id|>\n\n{content}<|eot_id|>"
-        )
-    return "".join(parts)
+        , role == "assistant"))
+    return _join_parts(parts)
 
 
 def format_conversation(conversations, template, thinking=False, tools=False):
-    """Format a conversation according to the specified template.
-
-    Args:
-        conversations: list of {role, content} dicts
-        template: one of 'auto', 'chatml', 'llama3', 'apertus', 'apertus-think'
-        thinking: whether to convert <think> tags (for apertus)
-        tools: whether to enable tool capabilities (for apertus)
-
-    Returns:
-        Formatted string, or original conversations list if template is 'auto'
-    """
+    """Format a conversation and return (text, assistant_spans)."""
     if template == "auto" or template is None:
-        return None  # Signal to leave conversations as-is
+        return None, []
 
     if template == "apertus":
         return format_apertus(conversations, thinking=False, tools=tools)
@@ -138,7 +122,7 @@ def format_conversation(conversations, template, thinking=False, tools=False):
         return format_llama3(conversations)
 
     # Unknown template — pass through
-    return None
+    return None, []
 
 
 # Template metadata for documentation and validation

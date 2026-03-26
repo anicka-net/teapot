@@ -17,16 +17,6 @@ import time
 from pathlib import Path
 
 import torch
-from datasets import Dataset
-from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    DataCollatorForSeq2Seq,
-    Trainer,
-    TrainingArguments,
-)
 
 faulthandler.enable()
 
@@ -100,6 +90,40 @@ def apply_chat_template(tokenizer, messages, add_generation_prompt):
 
 def tokenize_with_label_masking(example, tokenizer, max_length):
     """Tokenize a chat example and mask all non-assistant tokens."""
+    if "text" in example:
+        full_text = example["text"]
+        spans = example.get("assistant_spans", [])
+        full_tokens = tokenizer(
+            full_text,
+            truncation=True,
+            max_length=max_length,
+            padding=False,
+            return_tensors=None,
+            add_special_tokens=False,
+        )
+        labels = [-100] * len(full_tokens["input_ids"])
+        for start_char, end_char in spans:
+            prefix_len = len(tokenizer(
+                full_text[:start_char],
+                truncation=True,
+                max_length=max_length,
+                padding=False,
+                return_tensors=None,
+                add_special_tokens=False,
+            )["input_ids"])
+            through_len = len(tokenizer(
+                full_text[:end_char],
+                truncation=True,
+                max_length=max_length,
+                padding=False,
+                return_tensors=None,
+                add_special_tokens=False,
+            )["input_ids"])
+            for j in range(prefix_len, min(through_len, len(labels))):
+                labels[j] = full_tokens["input_ids"][j]
+        full_tokens["labels"] = labels
+        return full_tokens
+
     messages = example.get("messages") or example.get("conversations", [])
 
     full_text = apply_chat_template(tokenizer, messages, add_generation_prompt=False)
@@ -156,6 +180,17 @@ def build_dataset(raw_examples, tokenizer, max_length):
 
 
 def main():
+    from datasets import Dataset
+    from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        BitsAndBytesConfig,
+        DataCollatorForSeq2Seq,
+        Trainer,
+        TrainingArguments,
+    )
+
     args = parse_args()
     start_time = time.time()
 

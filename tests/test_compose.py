@@ -205,3 +205,108 @@ def test_compose_manifest_records_curation_details(tmp_path, monkeypatch):
     assert module_info["curation"]["version"] == "v1"
     assert module_info["curation"]["path"].endswith("safety-consequence-v1.json")
     assert module_info["curation"]["integrity"].startswith("sha256:")
+
+
+def test_compose_applies_apertus_think_template(tmp_path, monkeypatch):
+    config_path = tmp_path / "test.config"
+    config_path.write_text(
+        "\n".join(
+            [
+                "base:",
+                "  model: apertus/test",
+                "modules:",
+                "  safety/consequence: true",
+                "license:",
+                "  allowed: all",
+                "training:",
+                "  chat_template: apertus-think",
+                "output:",
+                "  file: out.jsonl",
+            ]
+        )
+        + "\n"
+    )
+
+    data_path = tmp_path / "prepared.jsonl"
+    data_path.write_text(
+        json.dumps(
+            {
+                "id": "ex-1",
+                "license": "MIT",
+                "conversations": [
+                    {"role": "system", "content": "sys"},
+                    {"role": "user", "content": "hello"},
+                    {"role": "assistant", "content": "<think>reason</think>\n\nanswer"},
+                ],
+            }
+        )
+        + "\n"
+    )
+
+    module_dir = tmp_path / "module"
+    module_dir.mkdir()
+    (module_dir / "module.yaml").write_text("name: safety/consequence\n")
+
+    monkeypatch.setattr(compose_mod, "TEAPOT_ROOT", tmp_path)
+    monkeypatch.setattr(compose_mod, "find_module", lambda module_name: (module_dir, module_dir / "module.yaml"))
+    monkeypatch.setattr(compose_mod, "run_prepare", lambda *args, **kwargs: data_path)
+
+    compose_mod.compose(str(config_path), output=str(tmp_path / "out.jsonl"))
+
+    row = json.loads((tmp_path / "out.jsonl").read_text().strip())
+    assert row["text"].startswith("<|system_start|>sys<|system_end|><|developer_start|>")
+    assert "<|inner_prefix|>reason<|inner_suffix|>answer<|assistant_end|>" in row["text"]
+    assert row["assistant_spans"]
+
+
+def test_compose_applies_apertus_full_tool_mode(tmp_path, monkeypatch):
+    config_path = tmp_path / "test.config"
+    config_path.write_text(
+        "\n".join(
+            [
+                "base:",
+                "  model: apertus/test",
+                "modules:",
+                "  capability/tool-use: true",
+                "license:",
+                "  allowed: all",
+                "training:",
+                "  chat_template: apertus-full",
+                "output:",
+                "  file: out.jsonl",
+            ]
+        )
+        + "\n"
+    )
+
+    data_path = tmp_path / "prepared.jsonl"
+    data_path.write_text(
+        json.dumps(
+            {
+                "id": "tool-1",
+                "license": "Apache-2.0",
+                "conversations": [
+                    {"role": "system", "content": "sys"},
+                    {"role": "user", "content": "weather?"},
+                    {"role": "assistant", "content": "<think>use tool</think>\n\ncalling"},
+                    {"role": "tool", "content": "{\"temp\": 20}"},
+                    {"role": "assistant", "content": "It is 20C."},
+                ],
+            }
+        )
+        + "\n"
+    )
+
+    module_dir = tmp_path / "module"
+    module_dir.mkdir()
+    (module_dir / "module.yaml").write_text("name: capability/tool-use\n")
+
+    monkeypatch.setattr(compose_mod, "TEAPOT_ROOT", tmp_path)
+    monkeypatch.setattr(compose_mod, "find_module", lambda module_name: (module_dir, module_dir / "module.yaml"))
+    monkeypatch.setattr(compose_mod, "run_prepare", lambda *args, **kwargs: data_path)
+
+    compose_mod.compose(str(config_path), output=str(tmp_path / "out.jsonl"))
+
+    row = json.loads((tmp_path / "out.jsonl").read_text().strip())
+    assert "Tool Capabilities: enabled" in row["text"]
+    assert "[Tool result]: {\"temp\": 20}" in row["text"]

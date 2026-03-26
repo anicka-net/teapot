@@ -23,6 +23,7 @@ from pathlib import Path
 import yaml
 
 from teapot.root import find_root
+from teapot.templates import TEMPLATES
 TEAPOT_ROOT = find_root()
 
 
@@ -94,6 +95,11 @@ def generate_axolotl(teapot_config, train_data, output):
     chat_template = training.get("chat_template", "auto")
     if chat_template == "auto":
         chat_template = None  # Let Axolotl auto-detect
+    elif chat_template in {"apertus", "apertus-think", "apertus-tools", "apertus-full"}:
+        raise ValueError(
+            f"Axolotl backend does not support Teapot-owned template '{chat_template}'. "
+            "Use qlora-hf on compose-formatted output instead."
+        )
 
     axolotl = {
         "base_model": model_name,

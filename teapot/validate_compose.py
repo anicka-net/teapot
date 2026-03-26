@@ -35,11 +35,16 @@ def check_format(examples):
 
     for i, ex in enumerate(examples):
         convs = ex.get("conversations", [])
+        text = ex.get("text", "")
 
-        if not convs:
+        if not convs and not text:
             log(f"Example {i} ({ex.get('id', '?')}): empty conversations", "FAIL")
             errors += 1
             continue
+
+        if text and not ex.get("assistant_spans"):
+            log(f"Example {i} ({ex.get('id', '?')}): formatted text missing assistant_spans", "FAIL")
+            errors += 1
 
         roles = [m.get("role") for m in convs]
         valid_roles = {"system", "user", "assistant", "ipython", "tool"}
@@ -192,8 +197,11 @@ def check_tokenization(examples, tokenizer_name, max_length=4096, sample_size=10
     for ex in sample:
         convs = ex.get("conversations", [])
         try:
-            text = tokenizer.apply_chat_template(convs, tokenize=False)
-            tokens = tokenizer.encode(text)
+            if ex.get("text"):
+                tokens = tokenizer.encode(ex["text"], add_special_tokens=False)
+            else:
+                text = tokenizer.apply_chat_template(convs, tokenize=False)
+                tokens = tokenizer.encode(text)
             lengths.append(len(tokens))
             if len(tokens) > max_length:
                 too_long += 1

@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 
 from teapot.root import find_root
+from teapot.templates import TEMPLATES, format_conversation
 TEAPOT_ROOT = find_root()
 
 
@@ -430,6 +431,8 @@ def compose(config_path, output=None, dry_run=False):
     # Strip compose metadata before writing
     strip_think = config.get("strip_think", False)
 
+    template_applied = config["chat_template"] in TEMPLATES and config["chat_template"] != "auto"
+
     with open(out_path, "w", encoding="utf-8") as f:
         for ex in weighted:
             convs = ex.get("conversations") or ex.get("messages", [])
@@ -452,6 +455,11 @@ def compose(config_path, output=None, dry_run=False):
                 "id": ex.get("id", ""),
                 "conversations": convs,
             }
+            if template_applied:
+                formatted_text, assistant_spans = format_conversation(convs, config["chat_template"])
+                if formatted_text is not None:
+                    clean["text"] = formatted_text
+                    clean["assistant_spans"] = assistant_spans
             if "category" in ex:
                 clean["category"] = ex["category"]
             if "source" in ex:
@@ -466,6 +474,7 @@ def compose(config_path, output=None, dry_run=False):
         "config": str(config_path),
         "base_model": config["base_model"],
         "chat_template": config["chat_template"],
+        "template_formatter": "teapot.templates:v1" if template_applied else "backend-native",
         "seed": config["seed"],
         "total_examples": len(weighted),
         "modules": {},
