@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """
-Teapot Unsloth Backend — fast QLoRA training for 8B models.
+Teapot Unsloth Backend — fast training with Unsloth kernels.
 
-Unsloth provides 2-4x speedup over HF Trainer for QLoRA on single GPU.
-Best for quick iterations on 8B models (ai01 L40, consumer GPUs).
+Unsloth provides faster kernels for QLoRA/LoRA and supports full
+fine-tuning on compatible hardware. Teapot uses the same compose-time
+text + assistant-span contract here as in the other backends.
 
 Usage:
     python3 -m teapot.train_unsloth \\
@@ -16,11 +17,9 @@ Or via teapot:
 """
 
 import argparse
-import json
 import sys
-from pathlib import Path
 
-from teapot.templates import TEMPLATES, format_conversation
+from teapot.train_common import FormattedDataset, collate_fn, verify_template_tokens
 
 
 def verify_unsloth():
@@ -36,10 +35,11 @@ def verify_unsloth():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Fast QLoRA training with unsloth")
+    parser = argparse.ArgumentParser(description="Training with Unsloth kernels")
     parser.add_argument("--model", required=True, help="HuggingFace model or local path")
     parser.add_argument("--data", required=True, help="Training JSONL (from teapot compose)")
     parser.add_argument("--output", default="output-unsloth", help="Output directory")
+    parser.add_argument("--method", choices=["qlora", "lora", "full"], default="qlora")
     parser.add_argument("--epochs", type=int, default=3)
     parser.add_argument("--lr", type=float, default=2e-4)
     parser.add_argument("--batch-size", type=int, default=2)
@@ -58,15 +58,14 @@ def main():
         sys.exit(1)
 
     from unsloth import FastLanguageModel
-    from trl import SFTTrainer
-    from transformers import TrainingArguments
-    from datasets import Dataset
+    from transformers import Trainer, TrainingArguments
 
     print("=" * 60)
-    print("TEAPOT UNSLOTH TRAINING (fast QLoRA)")
+    print("TEAPOT UNSLOTH TRAINING")
     print(f"Model:  {args.model}")
     print(f"Data:   {args.data}")
     print(f"Output: {args.output}")
+    print(f"Method: {args.method}")
     print(f"Epochs: {args.epochs}, LR: {args.lr}")
     print(f"LoRA:   r={args.lora_r}, alpha={args.lora_alpha}")
     print("=" * 60)
@@ -77,52 +76,37 @@ def main():
         model_name=args.model,
         max_seq_length=args.max_length,
         dtype=None,  # auto-detect
-        load_in_4bit=True,
+        load_in_4bit=args.method == "qlora",
+        full_finetuning=args.method == "full",
     )
 
-    # Apply LoRA
-    model = FastLanguageModel.get_peft_model(
-        model,
-        r=args.lora_r,
-        target_modules=[
-            "q_proj", "k_proj", "v_proj", "o_proj",
-            "gate_proj", "up_proj", "down_proj",
-        ],
-        lora_alpha=args.lora_alpha,
-        lora_dropout=0,  # unsloth optimized for 0 dropout
-        bias="none",
-        use_gradient_checkpointing="unsloth",
-        random_state=42,
-    )
+    print(f"\nVerifying template tokens for: {args.template or 'none'}")
+    if not verify_template_tokens(tokenizer, args.template):
+        sys.exit(1)
+
+    if args.method in {"qlora", "lora"}:
+        model = FastLanguageModel.get_peft_model(
+            model,
+            r=args.lora_r,
+            target_modules=[
+                "q_proj", "k_proj", "v_proj", "o_proj",
+                "gate_proj", "up_proj", "down_proj",
+            ],
+            lora_alpha=args.lora_alpha,
+            lora_dropout=0,
+            bias="none",
+            use_gradient_checkpointing="unsloth",
+            random_state=42,
+        )
 
     # Load and format data
     print("\nLoading data...")
-    examples = []
-    with open(args.data) as f:
-        for line in f:
-            if not line.strip():
-                continue
-            ex = json.loads(line)
-
-            if "text" in ex and ex["text"]:
-                # Pre-formatted by compose
-                examples.append({"text": ex["text"]})
-            else:
-                # Apply template
-                convs = ex.get("conversations", ex.get("messages", []))
-                if args.template:
-                    text, _ = format_conversation(convs, args.template, thinking=True)
-                    if text:
-                        examples.append({"text": text})
-                else:
-                    # Use tokenizer's chat template
-                    text = tokenizer.apply_chat_template(
-                        convs, tokenize=False, add_generation_prompt=False
-                    )
-                    examples.append({"text": text})
-
-    print(f"Loaded {len(examples)} examples")
-    dataset = Dataset.from_list(examples)
+    dataset = FormattedDataset(
+        args.data,
+        tokenizer,
+        max_length=args.max_length,
+        template=args.template,
+    )
 
     # Training
     training_args = TrainingArguments(
@@ -142,40 +126,38 @@ def main():
         report_to="none",
     )
 
-    trainer = SFTTrainer(
+    trainer = Trainer(
         model=model,
         tokenizer=tokenizer,
         train_dataset=dataset,
         args=training_args,
-        dataset_text_field="text",
-        max_seq_length=args.max_length,
-        packing=True,
+        data_collator=collate_fn,
     )
 
     print("\nStarting training...")
     trainer.train()
 
-    # Save LoRA adapter
-    print(f"\nSaving LoRA adapter to {args.output}/final/")
+    print(f"\nSaving to {args.output}/final/")
     model.save_pretrained(f"{args.output}/final")
     tokenizer.save_pretrained(f"{args.output}/final")
 
-    # Also save merged model if space allows
-    print(f"Saving merged model to {args.output}/merged/")
-    try:
-        model.save_pretrained_merged(
-            f"{args.output}/merged",
-            tokenizer,
-            save_method="merged_16bit",
-        )
-    except Exception as e:
-        print(f"Merged save failed (likely OOM): {e}")
-        print("LoRA adapter saved successfully — merge manually later.")
+    if args.method in {"qlora", "lora"}:
+        print(f"Saving merged model to {args.output}/merged/")
+        try:
+            model.save_pretrained_merged(
+                f"{args.output}/merged",
+                tokenizer,
+                save_method="merged_16bit",
+            )
+        except Exception as e:
+            print(f"Merged save failed (likely OOM): {e}")
+            print("LoRA adapter saved successfully — merge manually later.")
 
     print("\n" + "=" * 60)
     print("TRAINING COMPLETE")
-    print(f"  LoRA: {args.output}/final/")
-    print(f"  Merged: {args.output}/merged/ (if available)")
+    print(f"  Final: {args.output}/final/")
+    if args.method in {"qlora", "lora"}:
+        print(f"  Merged: {args.output}/merged/ (if available)")
     print("=" * 60)
 
 

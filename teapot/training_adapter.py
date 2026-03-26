@@ -17,6 +17,7 @@ Usage:
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 
@@ -25,6 +26,23 @@ import yaml
 from teapot.root import find_root
 from teapot.templates import TEMPLATES
 TEAPOT_ROOT = find_root()
+
+
+UNSLOTH_MIN_VRAM_GB = {
+    3: {"qlora": 3.5, "lora": 8},
+    7: {"qlora": 5, "lora": 19},
+    8: {"qlora": 6, "lora": 22},
+    9: {"qlora": 6.5, "lora": 24},
+    11: {"qlora": 7.5, "lora": 29},
+    14: {"qlora": 8.5, "lora": 33},
+    27: {"qlora": 22, "lora": 64},
+    32: {"qlora": 26, "lora": 76},
+    40: {"qlora": 30, "lora": 96},
+    70: {"qlora": 41, "lora": 164},
+    81: {"qlora": 48, "lora": 192},
+    90: {"qlora": 53, "lora": 212},
+    405: {"qlora": 237, "lora": 950},
+}
 
 
 def estimate_batch_config(vram_gb, n_gpus, model_size_hint):
@@ -64,6 +82,33 @@ def detect_or_default_hardware(hardware, model_name, method, default_vram, defau
     except ImportError:
         pass
     return default_vram, default_gpus
+
+
+def detect_model_size_b(model_name):
+    """Extract model size in billions from a model name when possible."""
+    matches = re.findall(r"(\d+(?:\.\d+)?)\s*[bB]\b", model_name)
+    if not matches:
+        return None
+    return float(matches[-1])
+
+
+def unsloth_min_total_vram_gb(model_name, method):
+    """Return minimum total VRAM based on Unsloth's published QLoRA/LoRA tables.
+
+    For `full`, use the 16-bit LoRA figure as a conservative lower bound.
+    That catches clearly impossible plans, but it is not a guarantee that
+    full fine-tuning will fit.
+    """
+    size_b = detect_model_size_b(model_name)
+    if size_b is None:
+        return None
+
+    method_key = "lora" if method == "full" else method
+    sizes = sorted(UNSLOTH_MIN_VRAM_GB)
+    for size in sizes:
+        if size_b <= size:
+            return UNSLOTH_MIN_VRAM_GB[size].get(method_key)
+    return None
 
 
 def generate_axolotl(teapot_config, train_data, output):
@@ -291,8 +336,24 @@ def generate_unsloth(teapot_config, train_data, output):
 
     base = cfg.get("base", {})
     training = cfg.get("training", {})
+    hardware = cfg.get("hardware", {})
 
     model_name = base.get("model", "meta-llama/Llama-3.1-8B-Instruct")
+    method = base.get("method", "qlora")
+    if method not in {"qlora", "lora", "full"}:
+        raise ValueError(
+            f"Unsloth backend supports qlora, lora, or full. Got '{method}'."
+        )
+
+    vram, n_gpus = detect_or_default_hardware(hardware, model_name, method, 24, 1)
+    total_vram = vram * n_gpus
+    min_total_vram = unsloth_min_total_vram_gb(model_name, method)
+    if min_total_vram is not None and total_vram < min_total_vram:
+        raise ValueError(
+            f"Unsloth backend requires at least {min_total_vram} GB total VRAM for "
+            f"{method} on {model_name}; config/detected hardware provides {total_vram} GB."
+        )
+
     epochs = training.get("epochs", 3)
     lr = float(training.get("learning_rate", 2e-4))
     batch_size = training.get("batch_size", 2)
@@ -313,6 +374,7 @@ def generate_unsloth(teapot_config, train_data, output):
         f"  --model {model_name} \\",
         f"  --data {train_data} \\",
         f"  --output output-teapot-{config_stem} \\",
+        f"  --method {method} \\",
         f"  --epochs {epochs} \\",
         f"  --lr {lr} \\",
         f"  --batch-size {batch_size} \\",
@@ -334,6 +396,7 @@ def generate_unsloth(teapot_config, train_data, output):
 
     print(f"Generated unsloth training script: {output}")
     print(f"  Model: {model_name}")
+    print(f"  Method: {method}")
     print(f"  LoRA: r={lora_r}, alpha={lora_alpha}")
     print(f"  Epochs: {epochs}, LR: {lr}")
     print(f"  Template: {chat_template}")

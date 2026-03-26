@@ -1,7 +1,8 @@
 import json
 
 from teapot import training_adapter
-from teapot.train_full_hf import FormattedDataset, verify_special_tokens
+from teapot.train_common import FormattedDataset, verify_template_tokens
+from teapot.train_full_hf import verify_special_tokens
 
 
 class FakeTokenizer:
@@ -52,6 +53,7 @@ def test_verify_special_tokens_accepts_registered_single_token_controls():
     }
     tokenizer = FakeTokenizer(encodings, special_tokens=encodings.keys())
 
+    assert verify_template_tokens(tokenizer, "apertus-think") is True
     assert verify_special_tokens(tokenizer, "apertus-think") is True
 
 
@@ -82,6 +84,7 @@ def test_verify_special_tokens_rejects_split_or_non_special_controls():
         },
     )
 
+    assert verify_template_tokens(tokenizer, "apertus-think") is False
     assert verify_special_tokens(tokenizer, "apertus-think") is False
 
 
