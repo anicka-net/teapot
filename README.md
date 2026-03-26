@@ -19,9 +19,9 @@ There's no `./configure && make` for training data.
 
 ```bash
 pip install -e .
-teapot compose configs/my-model.config
+teapot compose configs/my-model.config --lock
 teapot validate compose train.jsonl
-teapot train configs/my-model.config --train-data train.jsonl
+teapot train configs/my-model.config --train-data train.jsonl --backend unsloth
 teapot eval configs/my-model.config --tier standard
 teapot sbom train.manifest.json
 ```
@@ -42,14 +42,16 @@ license:
 
 training:
   epochs: 3
+  chat_template: auto            # or: apertus-think, chatml, llama3
   weights:
     safety/consequence: 1.0
     capability/tool-use: 0.5
 ```
 
-Teapot handles the rest: fetch data, apply license filter, weight
-and merge, validate format, generate framework config, run eval
-gates, produce SBOM. Deterministic and reproducible.
+Teapot handles the rest: fetch data, apply chat template, filter
+by license, weight and merge, validate format and tokens, generate
+framework config, run eval gates, produce SBOM. Deterministic and
+reproducible.
 
 ## What's a Module?
 
@@ -59,14 +61,12 @@ A module wraps a curated dataset with metadata:
 modules/safety/consequence/
 ├── module.yaml      # what it is, what it needs, how to test it
 ├── prepare.py       # how to get the data
+├── curations/       # reviewed dataset selection decisions
 └── eval/            # how to verify the model learned it
 ```
 
-Modules declare dependencies (`safety/consequence` requires
-`base/language`), suggested weights, license metadata per example,
-and evaluation gates that must pass before release.
-
-Current modules:
+See [docs/MODULES.md](docs/MODULES.md) for the full list and
+creation guide.
 
 | Module | Examples | What it teaches |
 |--------|----------|-----------------|
@@ -74,23 +74,92 @@ Current modules:
 | `safety/kagyu` | 623 | Buddhist contemplative ethics (optional) |
 | `capability/tool-use` | 5,000 | Call functions, decide when not to |
 | `capability/reward-evaluator` | 503 | Score responses on 6 dimensions |
-| `domain/cve-backport` | 35,667 | Generate security patches from CVE descriptions |
+| `domain/cve-backport` | 36,168 | Generate security patches from CVEs |
 | `lang/dzongkha` | 28 | Dzongkha language identification (seed) |
 
 ## Pipeline
 
 ```
-compose → lock → validate → train → eval → sbom
+configure → compose → lock → validate → train → eval → sbom
 ```
 
-| Step | What it does |
-|------|--------------|
+| Command | What it does |
+|---------|--------------|
+| `teapot configure` | Interactive config (guided, show, or agent JSON mode) |
 | `teapot compose` | Merge modules into training JSONL + manifest |
 | `teapot lock` | Pin source hashes for reproducibility |
 | `teapot validate` | Check format, content, chat template, determinism |
-| `teapot train` | Generate Axolotl/TRL config from teapot config |
+| `teapot train` | Generate launch script for training backend |
 | `teapot eval` | Run module-declared eval gates (including Garak) |
 | `teapot sbom` | Generate SPDX 3.0 AI Profile provenance document |
+| `teapot sources` | Show data source resolution status |
+| `teapot hardware` | Detect GPUs, suggest training parameters |
+| `teapot curate` | Manage versioned dataset selection decisions |
+
+## Training Backends
+
+| Backend | Command | Use case |
+|---------|---------|----------|
+| Unsloth | `--backend unsloth` | Fast QLoRA, 2-4x speedup, single GPU |
+| HF QLoRA | `--backend qlora-hf` | Standard QLoRA via HF Trainer |
+| HF Full | `--backend full-hf` | Full fine-tune, DeepSpeed ZeRO-3 |
+| Axolotl | `--backend axolotl` | Feature-rich, YAML config |
+
+## Chat Templates
+
+Teapot applies chat templates at compose time, ensuring training
+data matches the model's native token format. Templates verified
+before training starts — mismatched special tokens fail fast.
+
+| Template | Model | Tokens |
+|----------|-------|--------|
+| `auto` | Any | Pass through, framework handles it |
+| `apertus-think` | Apertus | Native tokens + `<\|inner_prefix\|>` deliberation |
+| `apertus-full` | Apertus | Native + deliberation + tools |
+| `chatml` | Mistral, etc. | `<\|im_start\|>` / `<\|im_end\|>` |
+| `llama3` | Llama 3.x | `<\|start_header_id\|>` / `<\|eot_id\|>` |
+
+## Data Sources
+
+Modules declare what data they need. You declare where it lives:
+
+```bash
+# Show resolution status
+teapot sources --list
+
+# Configure local paths (gitignored, per-developer)
+cp teapot.sources.yaml.example teapot.sources.yaml
+# Edit paths for your setup
+```
+
+Resolution chain: CLI override → env var → source map → module defaults.
+
+## Curation Cache
+
+Dataset review decisions are versioned artifacts, not ephemeral
+LLM conversations:
+
+```bash
+teapot curate list                         # show cached decisions
+teapot curate create --module safety/consequence --version v1 \
+    --scorer "sonnet+human" --input decisions.jsonl --publish
+```
+
+Published curations ship with the module. Local curations are
+gitignored experiments. Compose applies curations automatically.
+
+## Tools
+
+Post-training analysis and model surgery:
+
+- **activation-geometry** — measure safety/compassion axes across models
+- **h-neurons** — find where safety lives in the network
+- **activation-capping** — steer models at inference time
+- **abliteration** — remove refusal directions
+- **redteam** — analyze eval failures via uncensored local model
+
+All tools accept external config files — no hardcoded prompts.
+See [tools/README.md](tools/README.md).
 
 ## Why This Exists
 
@@ -101,29 +170,20 @@ and whether it passed its tests.
 
 See [ETHICS.md](ETHICS.md) for the full position.
 
-## Tools
-
-Post-training analysis and model surgery, independent of the
-training pipeline:
-
-- **activation-geometry** — measure safety/compassion axes across models
-- **h-neurons** — find where safety lives in the network
-- **activation-capping** — steer models at inference time
-- **abliteration** — remove refusal directions (for red-team analysis)
-
-See [tools/README.md](tools/README.md).
-
 ## Status
 
 Early development. The pipeline works end-to-end — we've trained
 8B and 70B models through it. Install with `pip install -e .`
 
-## Contributing
+## Documentation
 
-- [CONTRIBUTING.md](CONTRIBUTING.md) — humans
-- [AGENTS.md](AGENTS.md) — AI agents (yes, really)
-- [docs/DESIGN.md](docs/DESIGN.md) — architecture and decisions
-- [docs/LICENSES.md](docs/LICENSES.md) — license handling
+- [ETHICS.md](ETHICS.md) — ethical foundation (read this first)
+- [CONTRIBUTING.md](CONTRIBUTING.md) — how to contribute as a human
+- [AGENTS.md](AGENTS.md) — how to contribute as an AI agent
+- [docs/MODULES.md](docs/MODULES.md) — module details and creation guide
+- [docs/DESIGN.md](docs/DESIGN.md) — architecture, interfaces, decisions
+- [docs/LICENSES.md](docs/LICENSES.md) — license handling and filtering
+- [docs/redteam-setup.md](docs/redteam-setup.md) — red-team analysis setup
 
 ## License
 
