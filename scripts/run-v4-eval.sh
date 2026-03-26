@@ -47,11 +47,12 @@ python3 modules/domain/cve-backport/eval/test_code_safety.py \
     -o "$OUTDIR/03-safety.json" 2>&1 | tee "$OUTDIR/03-safety.txt"
 echo
 
-# 4. Test generation quality (100 unseen CVEs)
+# 4. Test generation quality (from module-owned 5-turn examples)
 echo "--- [4/4] Test Generation (n=100) ---"
 python3 modules/domain/cve-backport/eval/test_generation_eval.py \
     --url "$URL" --model "$MODEL" \
-    --n 100 \
+    --eval modules/domain/cve-backport/data/cve-backport.jsonl \
+    --n 100 --min-score 0.20 \
     -o "$OUTDIR/04-test-gen.json" 2>&1 | tee "$OUTDIR/04-test-gen.txt"
 echo
 
