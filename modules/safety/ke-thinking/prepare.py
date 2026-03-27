@@ -1,13 +1,8 @@
 #!/usr/bin/env python3
 """
-Prepare the Karma Electric consequence reasoning dataset.
+Prepare KE thinking data for Teapot compose.
 
-Source of truth: anicka/karma-electric-dataset on HuggingFace.
-Local prepared exports can be used as a cache via default_path in module.yaml.
-
-Usage:
-    python3 modules/safety/consequence/prepare.py
-    python3 modules/safety/consequence/prepare.py --output data/consequence.jsonl
+Source of truth: anicka/karma-electric-dataset (secular-thinking split).
 """
 
 import argparse
@@ -27,29 +22,27 @@ from teapot.hf_module import (
     resolve_hf_source_path,
 )
 
-DEFAULT_OUTPUT = Path(__file__).parent / "data" / "consequence.jsonl"
+DEFAULT_OUTPUT = Path(__file__).parent / "data" / "ke-thinking.jsonl"
 MODULE_YAML = yaml.safe_load((Path(__file__).parent / "module.yaml").read_text())
 
 
 def prepare(output=None):
-    """Load consequence reasoning examples from resolved source."""
-    source_cfg = get_source_config(MODULE_YAML, "ke-secular-conversational")
-    path = resolve_hf_source_path(MODULE_YAML, "ke-secular-conversational")
+    source_cfg = get_source_config(MODULE_YAML, "ke-secular-thinking")
+    path = resolve_hf_source_path(MODULE_YAML, "ke-secular-thinking")
 
     if not path:
-        print("ERROR: Could not resolve ke-secular-conversational source.")
+        print("ERROR: Could not resolve ke-secular-thinking source.")
         print("  Set up teapot.sources.yaml or ensure default_path exists.")
         sys.exit(1)
 
     print(f"Source: {path}")
     raw = load_jsonl(path)
 
-    license_id = source_cfg.get("license", MODULE_YAML.get("license", "Apache-2.0"))
+    license_id = source_cfg.get("license", "Apache-2.0")
 
-    # Add module metadata to each example
     examples = []
     for ex in raw:
-        ex["module"] = "safety/consequence"
+        ex["module"] = "safety/ke-thinking"
         ex["license"] = license_id
         examples.append(ex)
 
@@ -65,23 +58,18 @@ def prepare(output=None):
     from collections import Counter
     cats = Counter(ex.get("category", "?") for ex in examples)
     print(f"Exported {len(examples)} examples to {out_path}")
-    print(f"  Top categories: {', '.join(f'{c}({n})' for c, n in cats.most_common(5))}")
+    for c, n in cats.most_common():
+        print(f"  {c}: {n}")
 
     return examples
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Prepare KE consequence reasoning dataset"
-    )
+    parser = argparse.ArgumentParser(description="Prepare KE thinking data")
     parser.add_argument("--output", "-o", help="Output JSONL file")
-    # Legacy args accepted but ignored — data already has traces/prompts baked in
     parser.add_argument("--reasoning", action="store_true", help="No-op: data already has <think> traces")
     parser.add_argument("--format", help="Chat template (informational only)")
-    parser.add_argument("--tier", help="Ignored — tier filtering done at export time")
-    parser.add_argument("--local", help="Ignored — use teapot source resolution instead")
     args = parser.parse_args()
-
     prepare(output=args.output)
 
 

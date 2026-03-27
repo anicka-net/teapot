@@ -2,98 +2,74 @@
 """
 Prepare the Kagyu Buddhist ethics dataset.
 
-Exports Buddhist-tier examples from training.db for the optional
-contemplative ethics layer.
-
-Usage:
-    python3 modules/safety/kagyu/prepare.py
-    python3 modules/safety/kagyu/prepare.py --output data/kagyu.jsonl
-    python3 modules/safety/kagyu/prepare.py --local /path/to/training.db
+Source of truth: anicka/karma-electric-dataset (buddhist-conversational split).
 """
 
 import argparse
 import json
-import sqlite3
 import sys
 from pathlib import Path
 
+import yaml
+
+ROOT = Path(__file__).resolve().parents[3]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from teapot.hf_module import (
+    get_source_config,
+    load_jsonl,
+    resolve_hf_source_path,
+)
+
 DEFAULT_OUTPUT = Path(__file__).parent / "data" / "kagyu.jsonl"
+MODULE_YAML = yaml.safe_load((Path(__file__).parent / "module.yaml").read_text())
 
 
-def find_db(local_override=None):
-    if local_override:
-        path = Path(local_override).expanduser()
-        if path.exists():
-            return path
-        print(f"ERROR: specified path not found: {local_override}")
+def prepare(output=None):
+    source_cfg = get_source_config(MODULE_YAML, "ke-buddhist-conversational")
+    path = resolve_hf_source_path(MODULE_YAML, "ke-buddhist-conversational")
+
+    if not path:
+        print("ERROR: Could not resolve ke-buddhist-conversational source.")
+        print("  Set up teapot.sources.yaml or ensure default_path exists.")
         sys.exit(1)
 
-    try:
-        from teapot.sources import resolve_source
-        result = resolve_source("karma-electric-db")
-        if result:
-            return Path(result)
-    except ImportError:
-        pass
+    print(f"Source: {path}")
+    raw = load_jsonl(path)
 
-    for path in [
-        Path.home() / "playground" / "karma-electric" / "data" / "training.db",
-        Path("data") / "training.db",
-    ]:
-        if path.resolve().exists():
-            return path.resolve()
+    license_id = source_cfg.get("license", "Apache-2.0")
 
-    print("ERROR: training.db not found.")
-    print("  Configure: teapot sources  (set karma-electric-db)")
-    print("  Or pass:   --local /path/to/training.db")
-    sys.exit(1)
+    examples = []
+    for ex in raw:
+        ex["module"] = "safety/kagyu"
+        ex["license"] = license_id
+        examples.append(ex)
 
-
-def prepare(output=None, local=None):
-    db_path = find_db(local)
-    print(f"Source: {db_path}")
-
-    conn = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
-    v4 = conn.execute(
-        "SELECT content FROM system_prompts WHERE id = 'v4'"
-    ).fetchone()[0]
-
-    rows = conn.execute(
-        "SELECT id, category, source, conversations FROM examples "
-        "WHERE status = 'accepted' AND tier = 'buddhist' AND role = 'conversational' "
-        "ORDER BY category, id"
-    ).fetchall()
+    examples.sort(key=lambda x: (x.get("category", ""), x.get("id", "")))
 
     out_path = Path(output) if output else DEFAULT_OUTPUT
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(out_path, "w", encoding="utf-8") as f:
-        for eid, cat, source, convs_json in rows:
-            convs = json.loads(convs_json)
-            convs = [m for m in convs if m.get("role") != "system"]
-            convs.insert(0, {"role": "system", "content": v4})
+        for ex in examples:
+            f.write(json.dumps(ex, ensure_ascii=False) + "\n")
 
-            record = {
-                "id": eid,
-                "category": cat,
-                "source": source,
-                "tier": "buddhist",
-                "conversations": convs,
-                "module": "safety/kagyu",
-                "license": "Apache-2.0",
-            }
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    from collections import Counter
+    cats = Counter(ex.get("category", "?") for ex in examples)
+    print(f"Exported {len(examples)} examples to {out_path}")
+    print(f"  Top categories: {', '.join(f'{c}({n})' for c, n in cats.most_common(5))}")
 
-    print(f"Exported {len(rows)} Buddhist examples to {out_path}")
-    conn.close()
+    return examples
 
 
 def main():
     parser = argparse.ArgumentParser(description="Prepare Kagyu ethics dataset")
     parser.add_argument("--output", "-o", help="Output JSONL file")
-    parser.add_argument("--local", help="Path to training.db")
+    parser.add_argument("--reasoning", action="store_true", help="No-op: data already has <think> traces")
+    parser.add_argument("--format", help="Chat template (informational only)")
     args = parser.parse_args()
-    prepare(output=args.output, local=args.local)
+    prepare(output=args.output)
 
 
 if __name__ == "__main__":

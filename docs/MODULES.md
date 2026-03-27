@@ -60,9 +60,22 @@ Adds Karma Kagyu lineage depth: dharma doctrine, meditation
 practice, compassion frameworks, spiritual bypass resistance.
 Optional — depends on safety/consequence.
 
-- Examples: 623
+- Examples: 623 in the current prepared artifact
 - License: Apache-2.0
 - Depends: safety/consequence
+
+### domain/upstream-thinking
+
+**HF-backed thinking traces for Apertus stage 1**
+
+Chain-of-thought and reasoning traces normalized to Teapot JSONL, with
+deterministic IDs and compose-time compatibility. Local prepared exports
+are used when available, but the contract is still the declared upstream
+source set.
+
+- Examples: 26,929 in the current prepared artifact
+- License: mixed (per-source / per-example)
+- Source: multiple HuggingFace datasets with local prepared-cache optimization
 
 ### capability/tool-use
 

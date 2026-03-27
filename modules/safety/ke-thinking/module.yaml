@@ -1,0 +1,59 @@
+# Teapot Module: KE Thinking — Voice & Ethical Calibration
+# Source: anicka/karma-electric-dataset on HuggingFace
+
+name: safety/ke-thinking
+version: "1.0"
+description: >
+  KE-generated training data with baked-in <think> traces. Positive
+  engagement (700), grey area ethics (300), constitutional reasoning (200),
+  and crisis survival (50). Teaches the KE voice: consequence reasoning,
+  context-aware calibration, no performative empathy, European/global
+  perspective. Distinct from safety/consequence which covers the broader
+  secular conversational corpus.
+license: Apache-2.0
+maintainer: anicka
+
+depends:
+  - safety/consequence
+
+provides:
+  - ethical-reasoning
+  - thinking-traces
+  - crisis-awareness
+
+data:
+  sources:
+    - id: ke-secular-thinking
+      type: huggingface
+      repo: anicka/karma-electric-dataset
+      split: secular-thinking
+      default_path: ~/playground/karma-electric/data/hf-export/secular-thinking.jsonl
+      license: Apache-2.0
+      examples: 1250
+      description: >
+        KE-generated positive engagement, grey area ethics, constitutional
+        reasoning, and crisis survival data with <think> traces.
+
+  prepare:
+    script: prepare.py
+    args:
+      --output: data/ke-thinking.jsonl
+    accepts:
+      - --reasoning
+      - --format
+  format: chat-completion
+  examples: 1250
+  licenses:
+    default: Apache-2.0
+
+training:
+  suggested_weight: 1.0
+  min_examples: 500
+
+eval:
+  required: false
+  tiers:
+    fast:
+      - script: eval/test_format.py
+        pass_criteria:
+          has_think_pct: ">= 95"

@@ -2,7 +2,7 @@
 # Source: Karma Electric project (https://github.com/anicka-net/karma-electric-project)
 
 name: safety/consequence
-version: "10.3"
+version: "11.0"
 description: >
   Consequence-based ethical reasoning. Trains the model to evaluate
   actions by their effects on suffering rather than by rule compliance.
@@ -24,26 +24,23 @@ provides:
 
 data:
   sources:
-    - id: ke-training-db
-      type: sqlite
-      path: data/training.db
-      export_script: scripts/training_db.py
-      export_args: >
-        export --system-prompt v4
-        --category-prompt reward-evaluation:reward-evaluator-v1
-        --category-prompt reward-evaluation-v5:reward-evaluator-v1
-        --category-prompt reward-evaluation-style-variant:reward-evaluator-v1
-      integrity: null
+    - id: ke-secular-conversational
+      type: huggingface
+      repo: anicka/karma-electric-dataset
+      split: secular-conversational
+      default_path: ~/playground/karma-electric/data/hf-export/secular-conversational.jsonl
+      license: Apache-2.0
+      examples: 3196
+      description: Core KE secular conversational data with <think> traces
   prepare:
     script: prepare.py
     args:
-      --tier: secular
       --output: data/consequence.jsonl
     accepts:
       - --reasoning
+      - --format
   format: chat-completion
-  examples: 3140  # secular conversational, excluded dharma categories removed
-  filter: "category NOT LIKE 'reward-%' AND category NOT IN ('bodhichitta','buddhahood','buddhist-questions','contemplation','corporate-vs-dharma','daily-corporate','death-impermanence','dharma-accuracy-v6','dharma-capped-v5','dharma-doctrine','dharma-natural-v6','dharma-weaponization-v5','digital-dharma','doctrine-override','false-attainment-refusal','karma-misconceptions','madhyamaka','meditation','meditation-paramita','modern-life-dharma','precious-human-birth','refuge','spiritual','spiritual-bypassing','spiritual-diversity','suffering-refuge-expanded','suffering-samsara','teacher-devotion','wisdom-prajna','ai-dharma-identity')"
+  examples: 3196
   licenses:
     default: Apache-2.0
 

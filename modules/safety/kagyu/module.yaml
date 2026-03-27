@@ -1,11 +1,11 @@
 # Teapot Module: Karma Kagyu Contemplative Ethics
 
 name: safety/kagyu
-version: "10.3"
+version: "11.0"
 description: >
   Contemplative ethical reasoning from the Karma Kagyu tradition.
   Dharma doctrine, meditation, Buddhist philosophy, compassion
-  frameworks, spiritual bypass resistance. 826 curated examples.
+  frameworks, spiritual bypass resistance. 620 curated examples.
 license: Apache-2.0
 maintainer: anicka
 
@@ -18,13 +18,23 @@ provides:
 
 data:
   sources:
-    - type: sqlite
-      path: data/training.db
-      export_script: scripts/training_db.py
-      integrity: null
+    - id: ke-buddhist-conversational
+      type: huggingface
+      repo: anicka/karma-electric-dataset
+      split: buddhist-conversational
+      default_path: ~/playground/karma-electric/data/hf-export/buddhist-conversational.jsonl
+      license: Apache-2.0
+      examples: 620
+      description: Karma Kagyu contemplative ethics with <think> traces
+  prepare:
+    script: prepare.py
+    args:
+      --output: data/kagyu.jsonl
+    accepts:
+      - --reasoning
+      - --format
   format: chat-completion
-  examples: 440
-  filter: "category IN ('bodhichitta','buddhahood','buddhist-questions','contemplation','corporate-vs-dharma','daily-corporate','death-impermanence','dharma-accuracy-v6','dharma-capped-v5','dharma-doctrine','dharma-natural-v6','dharma-weaponization-v5','digital-dharma','doctrine-override','false-attainment-refusal','karma-misconceptions','madhyamaka','meditation','meditation-paramita','modern-life-dharma','precious-human-birth','refuge','spiritual','spiritual-bypassing','spiritual-diversity','suffering-refuge-expanded','suffering-samsara','teacher-devotion','wisdom-prajna','ai-dharma-identity')"
+  examples: 620
   licenses:
     default: Apache-2.0
 

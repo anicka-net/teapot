@@ -72,10 +72,11 @@ creation guide.
 |--------|----------|-----------------|
 | `safety/consequence` | 3,140 | KE secular consequence reasoning core |
 | `safety/consequence-aegis` | HF-backed | Consequence-style responses on Aegis prompts |
-| `safety/kagyu` | 623 | Buddhist contemplative ethics (optional) |
+| `safety/kagyu` | 623 | Karma Kagyu contemplative ethics extension |
 | `capability/tool-use` | 5,000 | Call functions, decide when not to |
 | `capability/reward-evaluator` | 503 | Score responses on 6 dimensions for reward models |
 | `domain/cve-backport` | 36,168 | Generate security patches from CVEs |
+| `domain/upstream-thinking` | 26,929 | Stage-1 Apertus thinking traces from HF-backed reasoning data |
 | `lang/dzongkha` | 28 | Dzongkha language identification (seed) |
 
 ## Pipeline
