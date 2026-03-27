@@ -44,7 +44,8 @@ def format_apertus(conversations, thinking=False, tools=False):
             dev_parts = []
             dev_parts.append(f"Deliberation: {'enabled' if thinking else 'disabled'}")
             dev_parts.append(f"Tool Capabilities: {'enabled' if tools else 'disabled'}")
-            parts.append((f"<|developer_start|>{'\\n'.join(dev_parts)}<|developer_end|>", False))
+            dev_text = "\n".join(dev_parts)
+            parts.append((f"<|developer_start|>{dev_text}<|developer_end|>", False))
 
         elif role == "user":
             parts.append((f"<|user_start|>{content}<|user_end|>", False))

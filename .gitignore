@@ -24,6 +24,7 @@ output-*/
 merged/
 checkpoints/
 train-teapot.sh
+train-v*.sh
 axolotl-config.yaml
 
 # IDE
@@ -45,6 +46,9 @@ garak_runs/
 
 # Curation cache (versioned selection decisions, local)
 .curations/
+
+# Local post-training ops scripts
+scripts/post-training-*.sh
 
 # Instance coordination (local communication between Claude instances)
 .instances/
