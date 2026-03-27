@@ -13,6 +13,23 @@ Run a small, uncensored local model to analyze failures. The model
 reads raw outputs, classifies them, and produces sanitized summaries
 that the AI agent can safely read.
 
+## Teapot Eval Runners
+
+Teapot now supports several safety-oriented eval runners in
+`teapot eval`:
+
+- `garak`: broad probe coverage, but keyword-based detectors can
+  undercount consequence-style refusals
+- `harmbench`: semantic harmfulness classification, better for
+  consequence-reasoning models
+- `strongreject`: refusal-first rubric scoring on forbidden prompts
+- `cbbench`: consequence-blindness benchmark, testing whether the
+  model tracks actual harm rather than surface risk words
+
+Use Garak as one signal, not the only one. For KE-style or other
+consequence-reasoning models, HarmBench and CB-Bench are the more
+meaningful gates.
+
 ## Recommended Models
 
 Any uncensored model that can follow structured instructions works.
