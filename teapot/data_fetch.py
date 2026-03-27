@@ -103,7 +103,7 @@ def fetch_local(path, module_name, filename=None, integrity=None):
     return cache_file
 
 
-def fetch_hf(repo, module_name, file=None, split=None, integrity=None):
+def fetch_hf(repo, module_name, file=None, split=None, integrity=None, revision=None):
     """Fetch from HuggingFace. Returns path to cached file."""
     try:
         from huggingface_hub import hf_hub_download, snapshot_download
@@ -126,6 +126,7 @@ def fetch_hf(repo, module_name, file=None, split=None, integrity=None):
                 repo_id=repo,
                 filename=file,
                 repo_type="dataset",
+                revision=revision,
                 local_dir=str(cache_file.parent),
             )
             # hf_hub_download puts it in a subdirectory, move to expected location
@@ -151,7 +152,7 @@ def fetch_hf(repo, module_name, file=None, split=None, integrity=None):
 
         print(f"  Loading dataset {repo} split={split} from HuggingFace...")
         try:
-            ds = load_dataset(repo, split=split)
+            ds = load_dataset(repo, split=split, revision=revision)
             ds.to_json(str(cache_file))
             print(f"  Downloaded: {cache_file} ({len(ds)} examples)")
             return cache_file
@@ -167,6 +168,7 @@ def fetch_hf(repo, module_name, file=None, split=None, integrity=None):
             path = snapshot_download(
                 repo_id=repo,
                 repo_type="dataset",
+                revision=revision,
                 local_dir=str(cache_dir / repo.replace("/", "_")),
             )
             print(f"  Downloaded: {path}")
@@ -233,6 +235,7 @@ def fetch_source(source_config, module_name):
             file=source_config.get("file"),
             split=source_config.get("split"),
             integrity=integrity,
+            revision=source_config.get("revision"),
         )
     elif src_type == "url":
         return fetch_url(

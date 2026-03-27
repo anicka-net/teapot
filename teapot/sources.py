@@ -107,7 +107,11 @@ def resolve_source(source_id: str, module_yaml: dict = None, no_fetch: bool = Fa
             if "repo" in val:
                 if no_fetch:
                     return None
-                return _fetch_from_hf(val["repo"], source_id, val.get("file"))
+                return _fetch_from_hf(
+                    val["repo"], source_id, val.get("file"),
+                    split=val.get("split"),
+                    revision=val.get("revision"),
+                )
 
     # 4. Module.yaml defaults
     if module_yaml:
@@ -115,7 +119,7 @@ def resolve_source(source_id: str, module_yaml: dict = None, no_fetch: bool = Fa
         for src in sources:
             if src.get("id") == source_id or len(sources) == 1:
                 # Try default_path
-                default_path = src.get("default_path")
+                default_path = src.get("default_path") or src.get("path")
                 if default_path:
                     path = Path(default_path).expanduser()
                     if path.exists():
@@ -126,24 +130,32 @@ def resolve_source(source_id: str, module_yaml: dict = None, no_fetch: bool = Fa
                         return str(root_path)
 
                 # Try default_repo (HuggingFace)
-                default_repo = src.get("default_repo")
+                default_repo = src.get("default_repo") or src.get("repo")
                 if default_repo:
                     if no_fetch:
                         return None
                     return _fetch_from_hf(
-                        default_repo, source_id, src.get("default_file")
+                        default_repo, source_id,
+                        src.get("default_file") or src.get("file"),
+                        split=src.get("default_split") or src.get("split"),
+                        revision=src.get("default_revision") or src.get("revision"),
                     )
 
     return None
 
 
-def _fetch_from_hf(repo: str, source_id: str, filename: str = None) -> str:
+def _fetch_from_hf(repo: str, source_id: str, filename: str = None,
+                   split: str = None, revision: str = None) -> str:
     """Fetch a source from HuggingFace, cache locally."""
     try:
         from teapot.data_fetch import fetch_source
         source_spec = {"type": "hf", "repo": repo}
         if filename:
             source_spec["file"] = filename
+        if split:
+            source_spec["split"] = split
+        if revision:
+            source_spec["revision"] = revision
         return fetch_source(source_spec, module_name=source_id)
     except ImportError:
         print(f"WARNING: huggingface_hub not installed. Cannot fetch {repo}")

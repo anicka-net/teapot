@@ -141,6 +141,23 @@ Modules can fetch data from:
 Use `teapot sources --list` to see configured data paths.
 Use `teapot.sources.yaml` to configure local paths.
 
+### HF-Backed Module Pattern
+
+For HuggingFace-backed modules, the contract is:
+
+1. `module.yaml` declares the upstream identity with `repo` and, when
+   needed, `revision`, `split`, or `file`
+2. local prepared exports may be declared via `default_path`, but only as
+   an optimization over the same source identity
+3. `prepare.py` resolves sources through Teapot source resolution rather
+   than hardcoding private cache paths
+4. normalization stays deterministic regardless of whether data came from
+   local prepared files or fetched upstream artifacts
+
+Do not declare a HuggingFace source and then make `prepare.py` depend on a
+private export path as the real contract. Cache is an optimization, not the
+module definition.
+
 ## Evaluation
 
 Each module declares eval gates in `module.yaml`:

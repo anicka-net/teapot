@@ -8,6 +8,8 @@ description: >
   Teaches the <think> pattern across STEM, ethics, logic, and finance
   domains. All converted to <think>...</think> format with quality
   filtering. Used as Stage 1 data for Apertus 70B thinking fine-tune.
+  Local prepared caches are an optimization only; the module contract
+  is still the declared upstream source set.
 license: mixed
 maintainer: anicka
 
@@ -26,6 +28,8 @@ data:
     - id: reddit-ethics
       type: huggingface
       repo: agentlans/reddit-ethics-conversations
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/converted/reddit-ethics-think.jsonl
       license: Apache-2.0
       examples: ~9700
       description: Multi-framework ethical reasoning (utilitarian/deontological/virtue)
@@ -33,6 +37,8 @@ data:
     - id: reddit-logic
       type: huggingface
       repo: agentlans/reddit-logic-conversations
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/converted/reddit-logic-think.jsonl
       license: Apache-2.0
       examples: ~9900
       description: Logical argumentation with claims/premises/evidence/validity
@@ -41,6 +47,8 @@ data:
     - id: isaiahbjork-cot
       type: huggingface
       repo: isaiahbjork/chain-of-thought
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/converted/isaiahbjork-think.jsonl
       license: Apache-2.0
       examples: ~7100
       description: General chain-of-thought with <thinking> XML tags
@@ -48,6 +56,8 @@ data:
     - id: personal-finance
       type: huggingface
       repo: isaiahbjork/personal-finance-chain-of-thought
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/converted/personal-finance-think.jsonl
       license: Apache-2.0
       examples: ~7000
       description: Financial reasoning with chain_of_thought traces
@@ -56,6 +66,8 @@ data:
     - id: jackrong-120b
       type: huggingface
       repo: jackrong120/r1_120b_self_instruct_40k
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/filtered/jackrong-120b-filtered.jsonl
       license: Apache-2.0
       examples: ~37000
       description: 120B self-instruct reasoning. Filtered to remove formatting tasks.
@@ -63,6 +75,8 @@ data:
     - id: logosforge
       type: huggingface
       repo: jackrong120/logosforge
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/filtered/logosforge-filtered.jsonl
       license: Apache-2.0
       examples: ~29000
       description: STEM reasoning. 96% math — use with cap to avoid domain skew.
@@ -71,6 +85,8 @@ data:
     - id: opus46
       type: huggingface
       repo: nohurry/opus46_open_reasoning
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/filtered/opus46-filtered.jsonl
       license: Apache-2.0
       examples: ~2300
       description: Opus 4.6 distilled reasoning traces
@@ -78,6 +94,8 @@ data:
     - id: qwen35
       type: huggingface
       repo: jackrong120/Qwen3.5_reasoning_700x
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/filtered/qwen35-filtered.jsonl
       license: Apache-2.0
       examples: ~280
       description: Qwen 3.5 reasoning traces (small, high quality)
@@ -86,19 +104,14 @@ data:
     - id: nvidia-safety
       type: huggingface
       repo: nvidia/Aegis-AI-Content-Safety-Dataset-2.0
+      split: train
+      default_path: ~/playground/karma-electric/data/upstream-thinking/converted/nvidia-tf_efficient_reasoning-think.jsonl
       license: CC-BY-4.0
       examples: ~8700
       description: >
         NVIDIA safety reasoning traces. NOTE: these are taxonomy-based
         (S-code classification), not consequence reasoning. Useful as
         thinking pattern but the safety logic differs from KE.
-
-  cache:
-    # If converted/filtered data exists here, skip download + conversion.
-    # These are the outputs of the KE conversion pipeline.
-    path: ~/playground/karma-electric/data/upstream-thinking
-    converted_dir: converted  # <source-id>-think.jsonl
-    filtered_dir: filtered    # <source-id>-filtered.jsonl
 
   prepare:
     script: prepare.py

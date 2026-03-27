@@ -154,6 +154,14 @@ JSONL format:
 These fields are part of the expected module output contract for Teapot
 compose, not optional documentation.
 
+For HuggingFace-backed modules:
+
+- declare the upstream source in `module.yaml`
+- use Teapot source resolution in `prepare.py`
+- treat local prepared caches as an optimization via `default_path`, not a
+  hidden module contract
+- keep normalization deterministic regardless of cache hit or fetch path
+
 ## 10. Philosophy
 
 From Linux kernel management-style.rst: avoid having to make
