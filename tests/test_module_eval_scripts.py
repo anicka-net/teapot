@@ -1,5 +1,7 @@
 import importlib.util
+import json
 from pathlib import Path
+import subprocess
 
 
 def _load_module(path_str, module_name):
@@ -74,7 +76,6 @@ def test_consequence_format_eval_requires_system_and_assistant(tmp_path):
     )
 
     # Execute the eval script via its main entry contract.
-    import subprocess
     result = subprocess.run(
         ["python3", "modules/safety/consequence/eval/test_format.py", str(data_path)],
         cwd="/home/anicka/playground/teapot",
@@ -84,3 +85,73 @@ def test_consequence_format_eval_requires_system_and_assistant(tmp_path):
 
     assert result.returncode == 1
     assert '"missing_system": 1' in result.stdout
+
+
+def test_format_eval_scripts_accept_orchestrator_style_url_flag(tmp_path):
+    cases = [
+        (
+            "modules/safety/consequence/eval/test_format.py",
+            {
+                "id": "sc-1",
+                "conversations": [
+                    {"role": "system", "content": "s"},
+                    {"role": "user", "content": "u"},
+                    {"role": "assistant", "content": "a"},
+                ],
+            },
+        ),
+        (
+            "modules/safety/consequence-aegis/eval/test_format.py",
+            {
+                "id": "sca-1",
+                "conversations": [
+                    {"role": "user", "content": "u"},
+                    {"role": "assistant", "content": "a"},
+                ],
+            },
+        ),
+        (
+            "modules/safety/ke-thinking/eval/test_format.py",
+            {
+                "id": "kt-1",
+                "conversations": [
+                    {"role": "user", "content": "u"},
+                    {"role": "assistant", "content": "<think>r</think>a"},
+                ],
+            },
+        ),
+        (
+            "modules/domain/upstream-thinking/eval/test_format.py",
+            {
+                "id": "ut-1",
+                "conversations": [
+                    {"role": "user", "content": "u"},
+                    {"role": "assistant", "content": "<think>r</think>a"},
+                ],
+            },
+        ),
+        (
+            "modules/capability/reward-evaluator/eval/test_format.py",
+            {
+                "id": "re-1",
+                "task": "reward-evaluation",
+                "category": "reward-evaluation",
+                "conversations": [
+                    {"role": "system", "content": "s"},
+                    {"role": "user", "content": "u"},
+                    {"role": "assistant", "content": "a"},
+                ],
+            },
+        ),
+    ]
+
+    for idx, (script, example) in enumerate(cases, start=1):
+        data_path = tmp_path / f"eval-{idx}.jsonl"
+        data_path.write_text(json.dumps(example) + "\n", encoding="utf-8")
+        result = subprocess.run(
+            ["python3", script, str(data_path), "--url", "http://localhost:9"],
+            cwd="/home/anicka/playground/teapot",
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, (script, result.stdout, result.stderr)

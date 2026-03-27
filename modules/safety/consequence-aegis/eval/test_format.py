@@ -1,21 +1,26 @@
 #!/usr/bin/env python3
 """Validate consequence-aegis export shape."""
 
+import argparse
 import json
-import sys
+from pathlib import Path
+
+
+DEFAULT_INPUT = Path(__file__).resolve().parents[1] / "data" / "consequence-aegis.jsonl"
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: test_format.py DATA.jsonl")
-        return 2
+    parser = argparse.ArgumentParser(description="Validate consequence-aegis export shape")
+    parser.add_argument("input", nargs="?", default=str(DEFAULT_INPUT))
+    parser.add_argument("--url", default="", help="Ignored for local format validation")
+    args = parser.parse_args()
 
     total = 0
     seen_ids = set()
     duplicate_ids = set()
     missing_assistant = 0
 
-    with open(sys.argv[1], encoding="utf-8") as f:
+    with open(args.input, encoding="utf-8") as f:
         for line in f:
             if not line.strip():
                 continue
@@ -34,6 +39,8 @@ def main():
         "duplicate_ids": len(duplicate_ids),
         "missing_assistant": missing_assistant,
         "pass": total > 0 and not duplicate_ids and missing_assistant == 0,
+        "passed": total if total > 0 and not duplicate_ids and missing_assistant == 0 else 0,
+        "total": total,
     }
     print(json.dumps(report, indent=2))
     return 0 if report["pass"] else 1

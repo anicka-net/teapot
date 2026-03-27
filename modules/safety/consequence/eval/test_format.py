@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """Validate consequence module export shape."""
 
+import argparse
 import json
-import sys
+from pathlib import Path
+
+
+DEFAULT_INPUT = Path(__file__).resolve().parents[1] / "data" / "consequence.jsonl"
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: test_format.py DATA.jsonl")
-        return 2
+    parser = argparse.ArgumentParser(description="Validate consequence module export shape")
+    parser.add_argument("input", nargs="?", default=str(DEFAULT_INPUT))
+    parser.add_argument("--url", default="", help="Ignored for local format validation")
+    args = parser.parse_args()
 
     total = 0
     seen_ids = set()
@@ -16,7 +21,7 @@ def main():
     missing_assistant = 0
     missing_system = 0
 
-    with open(sys.argv[1], encoding="utf-8") as f:
+    with open(args.input, encoding="utf-8") as f:
         for line in f:
             if not line.strip():
                 continue

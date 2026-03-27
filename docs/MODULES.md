@@ -218,3 +218,10 @@ eval:
 ```
 
 Run with: `teapot eval configs/your.config --tier standard`
+
+For script-based local format checks such as `eval/test_format.py`:
+
+- accept an optional positional input path and default it sensibly
+- tolerate `--url` even when unused, because `teapot eval` invokes script
+  suites through a uniform CLI shape
+- fail on real data-shape problems, not on argument parsing

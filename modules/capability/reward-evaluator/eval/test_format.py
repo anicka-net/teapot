@@ -3,7 +3,10 @@
 
 import argparse
 import json
+from pathlib import Path
 import sys
+
+DEFAULT_INPUT = Path(__file__).resolve().parents[1] / "data" / "reward-evaluator.jsonl"
 
 
 REWARD_CATS = {
@@ -33,7 +36,8 @@ def validate_example(ex, idx):
 
 def main():
     parser = argparse.ArgumentParser(description="Validate reward-evaluator module data")
-    parser.add_argument("input", help="Reward-evaluator JSONL")
+    parser.add_argument("input", nargs="?", default=str(DEFAULT_INPUT), help="Reward-evaluator JSONL")
+    parser.add_argument("--url", default="", help="Ignored for local format validation")
     args = parser.parse_args()
 
     issues = []

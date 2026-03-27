@@ -1,22 +1,27 @@
 #!/usr/bin/env python3
 """Validate upstream-thinking export shape."""
 
+import argparse
 import json
 import re
-import sys
+from pathlib import Path
+
+
+DEFAULT_INPUT = Path(__file__).resolve().parents[1] / "data" / "upstream-thinking.jsonl"
 
 
 def main():
-    if len(sys.argv) != 2:
-        print("Usage: test_format.py DATA.jsonl")
-        return 2
+    parser = argparse.ArgumentParser(description="Validate upstream-thinking export shape")
+    parser.add_argument("input", nargs="?", default=str(DEFAULT_INPUT))
+    parser.add_argument("--url", default="", help="Ignored for local format validation")
+    args = parser.parse_args()
 
     total = 0
     with_think = 0
     seen_ids = set()
     duplicate_ids = set()
 
-    with open(sys.argv[1], encoding="utf-8") as f:
+    with open(args.input, encoding="utf-8") as f:
         for line in f:
             if not line.strip():
                 continue
@@ -38,6 +43,8 @@ def main():
         "has_think_pct": pct,
         "duplicate_ids": len(duplicate_ids),
         "pass": total > 0 and pct >= 95.0 and not duplicate_ids,
+        "passed": with_think,
+        "total": total,
     }
     print(json.dumps(report, indent=2))
     return 0 if report["pass"] else 1
