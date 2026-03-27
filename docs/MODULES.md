@@ -34,10 +34,23 @@ rather than by rule compliance. Covers: consequence reasoning,
 contextual calibration, honest uncertainty, refusal with
 explanation, jailbreak resistance.
 
-- Examples: 3,341
+- Examples: 3,140
+- Source-specific note: this is the Karma Electric secular core module
 - License: Apache-2.0
 - Depends: base/language
 - Source: [Karma Electric](https://github.com/anicka-net/karma-electric-project)
+
+### safety/consequence-aegis
+
+**Published HuggingFace consequence-style safety dataset**
+
+Consequence-reasoning responses to NVIDIA Aegis safety prompts. This is
+kept separate from the KE secular core so its source contract and license
+stay explicit.
+
+- Examples: source-dependent after prepare
+- License: CC-BY-4.0
+- Source: [HuggingFace](https://huggingface.co/datasets/anicka/consequence-reasoning-safety)
 
 ### safety/kagyu
 

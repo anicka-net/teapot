@@ -70,7 +70,8 @@ creation guide.
 
 | Module | Examples | What it teaches |
 |--------|----------|-----------------|
-| `safety/consequence` | 3,341 | Reason about consequences, not categories |
+| `safety/consequence` | 3,140 | KE secular consequence reasoning core |
+| `safety/consequence-aegis` | HF-backed | Consequence-style responses on Aegis prompts |
 | `safety/kagyu` | 623 | Buddhist contemplative ethics (optional) |
 | `capability/tool-use` | 5,000 | Call functions, decide when not to |
 | `capability/reward-evaluator` | 503 | Score responses on 6 dimensions for reward models |

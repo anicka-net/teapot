@@ -1,0 +1,52 @@
+# Teapot Module: Consequence Reasoning on Aegis Prompts
+
+name: safety/consequence-aegis
+version: "1.0"
+description: >
+  Consequence-reasoning responses to NVIDIA Aegis safety prompts.
+  This is a published HuggingFace dataset, separate from the Karma
+  Electric secular core. It teaches consequence-style refusals and
+  explanations against a taxonomy-oriented prompt set.
+license: CC-BY-4.0
+maintainer: anicka
+
+depends:
+  - base/language
+
+provides:
+  - ethical-reasoning
+  - safety
+  - refusal-with-explanation
+
+data:
+  sources:
+    - id: consequence-reasoning-hf
+      type: huggingface
+      repo: anicka/consequence-reasoning-safety
+      split: train
+      license: CC-BY-4.0
+      description: >
+        Consequence-reasoning responses to NVIDIA Aegis safety prompts.
+        Published HuggingFace dataset; use this module when you want the
+        HF-exported source explicitly rather than the KE SQLite export.
+  prepare:
+    script: prepare.py
+    args:
+      --output: data/consequence-aegis.jsonl
+  format: chat-completion
+  licenses:
+    default: CC-BY-4.0
+
+training:
+  suggested_weight: 0.5
+  min_examples: 100
+  notes: >
+    Source-specific supplement. Do not assume it is behaviorally identical
+    to safety/consequence; it is a published consequence-style response
+    set built on NVIDIA Aegis prompts.
+
+eval:
+  required: false
+  tiers:
+    fast:
+      - script: eval/test_format.py
