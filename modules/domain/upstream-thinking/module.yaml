@@ -1,0 +1,129 @@
+# Teapot Module: Upstream Thinking / Chain-of-Thought Data
+# Curated and converted from open-source HuggingFace datasets
+
+name: domain/upstream-thinking
+version: "1.0"
+description: >
+  Chain-of-thought and reasoning traces from open-source datasets.
+  Teaches the <think> pattern across STEM, ethics, logic, and finance
+  domains. All converted to <think>...</think> format with quality
+  filtering. Used as Stage 1 data for Apertus 70B thinking fine-tune.
+license: mixed
+maintainer: anicka
+
+depends: []
+
+recommends:
+  - safety/consequence
+
+provides:
+  - reasoning
+  - chain-of-thought
+
+data:
+  sources:
+    # Ethics and moral reasoning
+    - id: reddit-ethics
+      type: huggingface
+      repo: agentlans/reddit-ethics-conversations
+      license: Apache-2.0
+      examples: ~9700
+      description: Multi-framework ethical reasoning (utilitarian/deontological/virtue)
+
+    - id: reddit-logic
+      type: huggingface
+      repo: agentlans/reddit-logic-conversations
+      license: Apache-2.0
+      examples: ~9900
+      description: Logical argumentation with claims/premises/evidence/validity
+
+    # General chain-of-thought
+    - id: isaiahbjork-cot
+      type: huggingface
+      repo: isaiahbjork/chain-of-thought
+      license: Apache-2.0
+      examples: ~7100
+      description: General chain-of-thought with <thinking> XML tags
+
+    - id: personal-finance
+      type: huggingface
+      repo: isaiahbjork/personal-finance-chain-of-thought
+      license: Apache-2.0
+      examples: ~7000
+      description: Financial reasoning with chain_of_thought traces
+
+    # STEM reasoning (filtered — heavy on math/formatting)
+    - id: jackrong-120b
+      type: huggingface
+      repo: jackrong120/r1_120b_self_instruct_40k
+      license: Apache-2.0
+      examples: ~37000
+      description: 120B self-instruct reasoning. Filtered to remove formatting tasks.
+
+    - id: logosforge
+      type: huggingface
+      repo: jackrong120/logosforge
+      license: Apache-2.0
+      examples: ~29000
+      description: STEM reasoning. 96% math — use with cap to avoid domain skew.
+
+    # Smaller high-quality sets
+    - id: opus46
+      type: huggingface
+      repo: nohurry/opus46_open_reasoning
+      license: Apache-2.0
+      examples: ~2300
+      description: Opus 4.6 distilled reasoning traces
+
+    - id: qwen35
+      type: huggingface
+      repo: jackrong120/Qwen3.5_reasoning_700x
+      license: Apache-2.0
+      examples: ~280
+      description: Qwen 3.5 reasoning traces (small, high quality)
+
+    # NVIDIA safety reasoning (taxonomy-based, not consequence — use with care)
+    - id: nvidia-safety
+      type: huggingface
+      repo: nvidia/Aegis-AI-Content-Safety-Dataset-2.0
+      license: CC-BY-4.0
+      examples: ~8700
+      description: >
+        NVIDIA safety reasoning traces. NOTE: these are taxonomy-based
+        (S-code classification), not consequence reasoning. Useful as
+        thinking pattern but the safety logic differs from KE.
+
+  cache:
+    # If converted/filtered data exists here, skip download + conversion.
+    # These are the outputs of the KE conversion pipeline.
+    path: ~/playground/karma-electric/data/upstream-thinking
+    converted_dir: converted  # <source-id>-think.jsonl
+    filtered_dir: filtered    # <source-id>-filtered.jsonl
+
+  prepare:
+    script: prepare.py
+    args:
+      --output: data/upstream-thinking.jsonl
+    accepts:
+      - --reasoning
+      - --format
+  format: chat-completion
+  licenses:
+    default: Apache-2.0
+
+training:
+  suggested_weight: 1.0
+  min_examples: 5000
+  notes: >
+    For Apertus Stage 1 (thinking), use full weight. For mixed training,
+    cap upstream sources to avoid overwhelming KE voice data. The
+    cluster_training_mix.py k-means approach caps per-cluster to prevent
+    topic over-representation.
+
+eval:
+  required: false
+  tiers:
+    fast:
+      - script: eval/test_format.py
+        pass_criteria:
+          has_think_pct: ">= 95"
