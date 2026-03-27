@@ -26,13 +26,16 @@ DEFAULT_OUTPUT = Path(__file__).parent / "data" / "ke-thinking.jsonl"
 MODULE_YAML = yaml.safe_load((Path(__file__).parent / "module.yaml").read_text())
 
 
-def prepare(output=None):
+def prepare(output=None, local_path=None):
     source_cfg = get_source_config(MODULE_YAML, "ke-secular-thinking")
-    path = resolve_hf_source_path(MODULE_YAML, "ke-secular-thinking")
+    path = Path(local_path).expanduser() if local_path else resolve_hf_source_path(MODULE_YAML, "ke-secular-thinking")
 
     if not path:
         print("ERROR: Could not resolve ke-secular-thinking source.")
         print("  Set up teapot.sources.yaml or ensure default_path exists.")
+        sys.exit(1)
+    if not path.exists():
+        print(f"ERROR: source path not found: {path}")
         sys.exit(1)
 
     print(f"Source: {path}")
@@ -69,8 +72,9 @@ def main():
     parser.add_argument("--output", "-o", help="Output JSONL file")
     parser.add_argument("--reasoning", action="store_true", help="No-op: data already has <think> traces")
     parser.add_argument("--format", help="Chat template (informational only)")
+    parser.add_argument("--local", help="Local JSONL path (overrides source resolution)")
     args = parser.parse_args()
-    prepare(output=args.output)
+    prepare(output=args.output, local_path=args.local)
 
 
 if __name__ == "__main__":

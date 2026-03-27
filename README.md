@@ -70,9 +70,10 @@ creation guide.
 
 | Module | Examples | What it teaches |
 |--------|----------|-----------------|
-| `safety/consequence` | 3,140 | KE secular consequence reasoning core |
+| `safety/consequence` | 3,196 | KE secular consequence reasoning core |
 | `safety/consequence-aegis` | HF-backed | Consequence-style responses on Aegis prompts |
-| `safety/kagyu` | 623 | Karma Kagyu contemplative ethics extension |
+| `safety/kagyu` | 620 | Karma Kagyu contemplative ethics extension |
+| `safety/ke-thinking` | 1,250 | KE voice and baked-in ethical thinking traces |
 | `capability/tool-use` | 5,000 | Call functions, decide when not to |
 | `capability/reward-evaluator` | 503 | Score responses on 6 dimensions for reward models |
 | `domain/cve-backport` | 36,168 | Generate security patches from CVEs |

@@ -34,11 +34,11 @@ rather than by rule compliance. Covers: consequence reasoning,
 contextual calibration, honest uncertainty, refusal with
 explanation, jailbreak resistance.
 
-- Examples: 3,140
-- Source-specific note: this is the Karma Electric secular core module
+- Examples: 3,196
+- Source-specific note: this is now the HuggingFace-backed KE secular core module
 - License: Apache-2.0
 - Depends: base/language
-- Source: [Karma Electric](https://github.com/anicka-net/karma-electric-project)
+- Source: [HuggingFace](https://huggingface.co/datasets/anicka/karma-electric-dataset) (`secular-conversational`)
 
 ### safety/consequence-aegis
 
@@ -60,9 +60,23 @@ Adds Karma Kagyu lineage depth: dharma doctrine, meditation
 practice, compassion frameworks, spiritual bypass resistance.
 Optional — depends on safety/consequence.
 
-- Examples: 623 in the current prepared artifact
+- Examples: 620
 - License: Apache-2.0
 - Depends: safety/consequence
+- Source: [HuggingFace](https://huggingface.co/datasets/anicka/karma-electric-dataset) (`buddhist-conversational`)
+
+### safety/ke-thinking
+
+**KE voice and baked-in ethical thinking traces**
+
+Focused KE-generated data with `<think>` traces already present:
+positive engagement, grey-area ethics, constitutional reasoning, and
+crisis survival. Used in the updated Apertus stage-2 mix.
+
+- Examples: 1,250
+- License: Apache-2.0
+- Depends: safety/consequence
+- Source: [HuggingFace](https://huggingface.co/datasets/anicka/karma-electric-dataset) (`secular-thinking`)
 
 ### domain/upstream-thinking
 
