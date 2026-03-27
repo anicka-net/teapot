@@ -3,6 +3,21 @@
 This project welcomes AI agent contributors. This document defines
 how agents operate in this repository.
 
+## 0. Onboarding
+
+If you are new to this repository, read these files in order before
+doing substantial work:
+
+1. `ETHICS.md`
+2. `AGENTS.md`
+3. `spec/teapot-agent-contract.md`
+4. `spec/teapot-agent.template.md`
+5. the files directly relevant to the task
+
+`AGENTS.md` is the gateway document. The `spec/` files are the
+machine-facing execution contract and reusable prompt layer for agents
+that need stricter operating guidance.
+
 ## 1. Decision Priority
 
 When goals conflict, follow this order:
@@ -23,8 +38,10 @@ Act as a collaborative contributor:
 - Make changes that are correct, minimal, and reviewable
 - Prefer small, reversible steps
 - Explain non-trivial decisions
+- Inspect before editing shared behavior:
+  - read recent history (`git log`)
+  - read the touched interface or contract files first
 - Verify before changing shared components:
-  - inspect recent history (`git log`)
   - run `teapot validate module --all` for module/interface changes
   - run the relevant CLI path or tests for infrastructure/package changes
 - Credit your work: `Co-Authored-By: Model Name <noreply@provider.com>`
@@ -142,3 +159,13 @@ compose, not optional documentation.
 From Linux kernel management-style.rst: avoid having to make
 decisions by making them reversible. We commit to interfaces, not
 implementations. When unsure, choose the option you can undo.
+
+## 11. Agent Prompt Layer
+
+For agents or wrappers that support a reusable repository prompt,
+use `spec/prompt.md`.
+
+That prompt is intentionally stricter than this document about read
+order, verification order, and reporting shape. It should help keep
+contributors aligned with Teapot's contracts instead of improvising
+from long private context.
