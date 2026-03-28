@@ -100,7 +100,16 @@ def collate_fn(batch):
 
 
 def verify_template_tokens(tokenizer, template):
-    """Verify Teapot-owned template control tokens are registered as single special tokens."""
+    """Verify Teapot-owned template control tokens encode as single tokens.
+
+    The critical safety property is single-token encoding: if a control
+    token encodes as multiple BPE pieces, the model cannot learn it as
+    an atomic delimiter and training will silently produce garbage.
+
+    Being in all_special_tokens is desirable but not required — Apertus
+    registers its tokens via added_tokens_encoder with single IDs but
+    only marks <|assistant_end|> as a HF "special token".
+    """
     if not template or template == "auto":
         return True
 
@@ -113,22 +122,25 @@ def verify_template_tokens(tokenizer, template):
         return True
 
     all_special_tokens = set(getattr(tokenizer, "all_special_tokens", []))
+    added_tokens = set(getattr(tokenizer, "added_tokens_encoder", {}).keys())
     ok = True
 
     for token in critical:
         ids = tokenizer.encode(token, add_special_tokens=False)
         is_special = token in all_special_tokens
-        if len(ids) != 1 or not is_special:
-            print(
-                f"ERROR: {token} encodes as {ids} and "
-                f"{'is not' if not is_special else 'is'} registered as a special token"
-            )
+        is_added = token in added_tokens
+
+        if len(ids) != 1:
+            print(f"  FAIL: {token} encodes as {ids} (multi-token — cannot train safely)")
             ok = False
+        elif not is_special and not is_added:
+            print(f"  WARN: {token} → {ids} (single-token but not in added_tokens — may split in context)")
         else:
-            print(f"  OK: {token} → {ids}")
+            status = "special" if is_special else "added"
+            print(f"  OK: {token} → {ids} ({status})")
 
     if not ok:
-        print("\nERROR: Template control tokens are not configured safely.")
+        print("\nERROR: Template control tokens encode as multiple pieces.")
         print("Refusing to start training with a broken chat format.")
         print("Check tokenizer_config.json / added_tokens.json for this model.")
 
