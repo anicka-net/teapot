@@ -264,6 +264,9 @@ def main():
         except ImportError:
             print("  Flash Attention not installed, using default attention")
             pass
+    else:
+        # Explicit eager attention — SDPA can fail on some CUDA/cuDNN combos
+        model_kwargs["attn_implementation"] = "eager"
 
     if args.qlora:
         print("  Using 4-bit QLoRA quantization...")
