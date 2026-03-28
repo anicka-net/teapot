@@ -257,8 +257,13 @@ def main():
         "trust_remote_code": True,
     }
 
-    if not args.no_flash_attn and "qwen3.5" not in args.model.lower():
-        model_kwargs["attn_implementation"] = "flash_attention_2"
+    if not args.no_flash_attn:
+        try:
+            import flash_attn  # noqa: F401
+            model_kwargs["attn_implementation"] = "flash_attention_2"
+        except ImportError:
+            print("  Flash Attention not installed, using default attention")
+            pass
 
     if args.qlora:
         print("  Using 4-bit QLoRA quantization...")
