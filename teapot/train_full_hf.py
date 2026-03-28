@@ -7,31 +7,26 @@ needs to reach embedding and output layers. Uses HuggingFace Trainer
 with DeepSpeed ZeRO-3 and CPU offload for optimizer states.
 
 Launch via:
-    deepspeed --num_gpus 2 -m teapot.train_full_hf \\
-        --model swiss-ai/Apertus-70B-Instruct-2509 \\
-        --data train.jsonl \\
-        --deepspeed deepspeed_configs/zero3-offload.json \\
+    deepspeed --num_gpus 2 teapot/train_full_hf.py \
+        --model swiss-ai/Apertus-70B-Instruct-2509 \
+        --data train.jsonl \
+        --deepspeed deepspeed_configs/zero3-offload.json \
         --epochs 2 --lr 2e-5 --template apertus-think
-
-Or via teapot:
-    teapot train configs/apertus-70b-full.config --backend full-hf
 """
 
 import argparse
+import json
 import sys
 
 import torch
 from teapot.train_common import FormattedDataset, collate_fn, verify_template_tokens
 from transformers import (
+    AutoConfig,
     AutoModelForCausalLM,
     AutoTokenizer,
     Trainer,
     TrainingArguments,
 )
-
-def verify_special_tokens(tokenizer, template):
-    """Backward-compatible alias for template-token verification."""
-    return verify_template_tokens(tokenizer, template)
 
 
 def main():
@@ -44,8 +39,7 @@ def main():
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--grad-accum", type=int, default=16)
     parser.add_argument("--max-length", type=int, default=4096)
-    parser.add_argument("--template", default=None,
-                        help="Chat template (if data doesn't have pre-formatted text)")
+    parser.add_argument("--template", default=None)
     parser.add_argument("--deepspeed", default=None, help="DeepSpeed config JSON")
     parser.add_argument("--warmup-ratio", type=float, default=0.05)
     parser.add_argument("--save-steps", type=int, default=100)
@@ -63,37 +57,18 @@ def main():
     print(f"Batch:  {args.batch_size} × {args.grad_accum} = {args.batch_size * args.grad_accum}")
     print("=" * 60)
 
-    # Load tokenizer and verify special tokens
+    # Load tokenizer
     print("\nLoading tokenizer...")
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
     print(f"\nVerifying template tokens for: {args.template or 'none'}")
-    if not verify_special_tokens(tokenizer, args.template):
+    if not verify_template_tokens(tokenizer, args.template):
         sys.exit(1)
 
-    # Load model in bf16 (no quantization)
-    print("\nLoading model in bf16...")
-    model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        torch_dtype=torch.bfloat16,
-        use_cache=False,  # Required for gradient checkpointing
-    )
-    model.gradient_checkpointing_enable()
-
-    print(f"Model: {model.config.num_hidden_layers} layers, "
-          f"{sum(p.numel() for p in model.parameters()) / 1e9:.1f}B parameters")
-
-    # Load dataset
-    print("\nLoading dataset...")
-    dataset = FormattedDataset(
-        args.data, tokenizer,
-        max_length=args.max_length,
-        template=args.template,
-    )
-
-    # Training arguments
+    # Training arguments — must be created BEFORE model loading so
+    # the Trainer's DeepSpeed integration can manage device placement.
     training_args = TrainingArguments(
         output_dir=args.output,
         num_train_epochs=args.epochs,
@@ -113,7 +88,33 @@ def main():
         report_to="none",
     )
 
-    # Trainer
+    # Load model with ZeRO-3 aware loading via Accelerate.
+    # The key: create TrainingArguments first (with deepspeed config),
+    # then use Trainer's model_init or load with the HF DeepSpeed plugin.
+    print("\nLoading model...")
+    config = AutoConfig.from_pretrained(args.model)
+    config.use_cache = False
+
+    # Load on CPU with eager attention — SDPA/FlashAttention can fail on
+    # some CUDA/cuDNN version combinations with non-standard architectures.
+    model = AutoModelForCausalLM.from_pretrained(
+        args.model,
+        config=config,
+        torch_dtype=torch.bfloat16,
+        attn_implementation="eager",
+    )
+
+    print(f"Model: {model.config.num_hidden_layers} layers, "
+          f"{sum(p.numel() for p in model.parameters()) / 1e9:.1f}B parameters")
+
+    # Load dataset
+    print("\nLoading dataset...")
+    dataset = FormattedDataset(
+        args.data, tokenizer,
+        max_length=args.max_length,
+        template=args.template,
+    )
+
     trainer = Trainer(
         model=model,
         args=training_args,
