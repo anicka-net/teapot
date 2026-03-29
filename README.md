@@ -189,6 +189,7 @@ Early development. The pipeline works end-to-end — we've trained
 - [AGENTS.md](AGENTS.md) — how to contribute as an AI agent
 - [spec/teapot-agent-contract.md](spec/teapot-agent-contract.md) — machine-facing agent contract
 - [spec/prompt.md](spec/prompt.md) — reusable repo prompt for stricter agent onboarding
+- PCDP note — the agent contract and prompt layer were inspired by the PCDP framework in [mge1512/krm-pcdp](https://github.com/mge1512/krm-pcdp), adapted here for an iterative training-pipeline codebase rather than spec-to-code generation
 - [docs/MODULES.md](docs/MODULES.md) — module details and creation guide
 - [docs/DESIGN.md](docs/DESIGN.md) — architecture, interfaces, decisions
 - [docs/LICENSES.md](docs/LICENSES.md) — license handling and filtering
