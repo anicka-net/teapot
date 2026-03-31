@@ -57,7 +57,8 @@ def format_apertus(conversations, thinking=False, tools=False):
                 match = re.match(r'<think>(.*?)</think>\s*(.*)', content, re.DOTALL)
                 if match:
                     think_content = match.group(1).strip()
-                    response_content = match.group(2).strip()
+                    # Strip any residual </think> tags (from double-tagged source data)
+                    response_content = match.group(2).replace('</think>', '').strip()
                     parts.append((
                         f"<|assistant_start|>"
                         f"<|inner_prefix|>{think_content}<|inner_suffix|>"
