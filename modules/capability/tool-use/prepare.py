@@ -72,7 +72,7 @@ def normalize_roles(messages, fmt="chatml"):
         if role in ("system", "user", "assistant"):
             normalized.append({"role": role, "content": content})
         elif role in ("tool", "ipython"):
-            if fmt == "apertus":
+            if fmt in ("apertus", "apertus-think", "apertus-full"):
                 normalized.append({"role": "user", "content": f"[Tool result]: {content}"})
             elif fmt == "llama":
                 normalized.append({"role": "ipython", "content": content})
@@ -121,7 +121,7 @@ def main():
     parser = argparse.ArgumentParser(description="Prepare tool-use training data")
     parser.add_argument(
         "--format", "-f",
-        choices=["chatml", "llama", "apertus"],
+        choices=["chatml", "llama", "apertus", "apertus-think", "apertus-full"],
         default="chatml",
         help="Target chat template format (default: chatml)",
     )
