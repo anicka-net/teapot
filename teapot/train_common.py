@@ -9,6 +9,38 @@ from torch.utils.data import Dataset
 from teapot.templates import TEMPLATES, format_conversation
 
 
+def format_with_tokenizer_template(messages, tokenizer):
+    """Apply the tokenizer's native chat template and compute character spans
+    covering each assistant turn.
+
+    Used when the Teapot config sets `chat_template: auto` (no Teapot-owned
+    template) and the data is conversational. Works for any tokenizer whose
+    chat template emits a strict prefix per message boundary, which is true
+    for Qwen, Llama, and Mistral families.
+
+    Returns (text, [(start, end), ...]).
+    """
+    full_text = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=False,
+    )
+
+    spans = []
+    for i, msg in enumerate(messages):
+        if msg.get("role") != "assistant":
+            continue
+        prefix = tokenizer.apply_chat_template(
+            messages[:i], tokenize=False, add_generation_prompt=True,
+        )
+        through = tokenizer.apply_chat_template(
+            messages[:i + 1], tokenize=False, add_generation_prompt=False,
+        )
+        if not full_text.startswith(through):
+            return full_text, []
+        spans.append([len(prefix), len(through)])
+
+    return full_text, spans
+
+
 class FormattedDataset(Dataset):
     """Dataset that reads compose output and preserves assistant-only masking."""
 
@@ -17,6 +49,7 @@ class FormattedDataset(Dataset):
         self.max_length = max_length
         self.examples = []
 
+        skipped_no_spans = 0
         with open(data_path) as f:
             for line in f:
                 if not line.strip():
@@ -28,9 +61,14 @@ class FormattedDataset(Dataset):
                     spans = ex.get("assistant_spans", [])
                 else:
                     convs = ex.get("conversations", ex.get("messages", []))
-                    if template:
+                    if template and template != "auto":
                         text, spans = format_conversation(convs, template, thinking=True)
                         if text is None:
+                            continue
+                    elif getattr(tokenizer, "chat_template", None):
+                        text, spans = format_with_tokenizer_template(convs, tokenizer)
+                        if not spans:
+                            skipped_no_spans += 1
                             continue
                     else:
                         text = "\n".join(m.get("content", "") for m in convs)
@@ -38,6 +76,8 @@ class FormattedDataset(Dataset):
 
                 self.examples.append({"text": text, "spans": spans})
 
+        if skipped_no_spans:
+            print(f"Skipped {skipped_no_spans} examples (chat template prefix mismatch)")
         print(f"Loaded {len(self.examples)} examples from {data_path}")
 
     def __len__(self):
