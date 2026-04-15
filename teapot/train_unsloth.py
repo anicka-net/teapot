@@ -128,7 +128,7 @@ def main():
 
     trainer = Trainer(
         model=model,
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
         train_dataset=dataset,
         args=training_args,
         data_collator=collate_fn,
