@@ -100,6 +100,21 @@ data:
       examples: ~280
       description: Qwen 3.5 reasoning traces (small, high quality)
 
+    # Opus 4.7 extended thinking distillation (diverse domains)
+    - id: lordx64-opus47
+      type: huggingface
+      repo: lordx64/reasoning-distill-claude-opus-4-7-max
+      split: train
+      default_path: ~/playground/karma-electric/data/lordx64-opus-reasoning-clean.jsonl
+      license: Apache-2.0
+      examples: ~3638
+      description: >
+        Claude Opus 4.7 extended thinking traces. Diverse domains:
+        math, physical reasoning, coding, financial planning, philosophy,
+        multilingual. Filtered from 8,124 raw to 3,638 clean examples
+        (end_turn, thinking>=500 chars, non-empty response). Median
+        thinking length 1,896 chars.
+
     # NVIDIA safety reasoning (taxonomy-based, not consequence — use with care)
     - id: nvidia-safety
       type: huggingface

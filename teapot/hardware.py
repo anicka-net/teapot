@@ -29,6 +29,7 @@ KNOWN_GPUS = {
     "RTX 3080": 10, "RTX 3070": 8,
     "T4": 16, "V100": 16, "V100S": 32,
     "P100": 16,
+    "GB10": 128,  # DGX Spark — unified CPU/GPU memory
 }
 
 # Model size heuristics (billions of params → approx memory in GB for QLoRA)

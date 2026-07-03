@@ -289,6 +289,7 @@ def test_compose_applies_apertus_full_tool_mode(tmp_path, monkeypatch):
                     {"role": "system", "content": "sys"},
                     {"role": "user", "content": "weather?"},
                     {"role": "assistant", "content": "<think>use tool</think>\n\ncalling"},
+                    {"role": "assistant", "content": '{"name": "get_weather", "arguments": {"location": "Prague"}}'},
                     {"role": "tool", "content": "{\"temp\": 20}"},
                     {"role": "assistant", "content": "It is 20C."},
                 ],
@@ -310,3 +311,9 @@ def test_compose_applies_apertus_full_tool_mode(tmp_path, monkeypatch):
     row = json.loads((tmp_path / "out.jsonl").read_text().strip())
     assert "Tool Capabilities: enabled" in row["text"]
     assert "[Tool result]: {\"temp\": 20}" in row["text"]
+    # Tool-call assistant turn MUST use <|tools_prefix|>, not plain <|assistant_start|>
+    assert "<|tools_prefix|>" in row["text"], (
+        "Tool-call JSON in assistant content must produce <|tools_prefix|> — "
+        "without this, the model learns tool JSON but never emits the token to initiate calls"
+    )
+    assert '"get_weather"' in row["text"]

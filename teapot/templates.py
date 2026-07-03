@@ -8,6 +8,8 @@ artifact itself is the source of truth. For those templates we emit:
 - `assistant_spans` so backends can mask loss without re-templating
 """
 
+import json
+
 
 # Apertus special token IDs for reference:
 # 61: <|system_start|>, 62: <|system_end|>
@@ -28,6 +30,28 @@ def _join_parts(parts):
         if is_assistant:
             spans.append([start, len(text)])
     return text, spans
+
+
+def _try_parse_tool_call(content):
+    """Detect if assistant content is tool-call JSON ({"name": ..., "arguments": ...}).
+
+    Returns parsed dict with name (str) and arguments (dict), or None.
+    Training data stores tool calls as plain assistant content, but Apertus
+    needs <|tools_prefix|> wrapping to teach the model to emit that token.
+    """
+    stripped = content.strip()
+    if not stripped.startswith("{"):
+        return None
+    try:
+        parsed = json.loads(stripped)
+        if isinstance(parsed, dict) and "name" in parsed and "arguments" in parsed:
+            args = parsed["arguments"]
+            if isinstance(args, str):
+                args = json.loads(args)
+            return {"name": parsed["name"], "arguments": args}
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return None
 
 
 def format_apertus(conversations, thinking=False, tools=False):
@@ -51,7 +75,36 @@ def format_apertus(conversations, thinking=False, tools=False):
             parts.append((f"<|user_start|>{content}<|user_end|>", False))
 
         elif role == "assistant":
-            if thinking and "<think>" in content:
+            # Check for structured tool_calls field first
+            tool_calls = msg.get("tool_calls")
+            # Then check for tool-call JSON in content
+            tool_call = None
+            if not tool_calls and tools:
+                tool_call = _try_parse_tool_call(content)
+
+            if tool_calls or tool_call:
+                # Format as tool call with <|tools_prefix|>
+                # Apertus format: [{"func_name": {args}}, ...]
+                tc_items = []
+                if tool_calls:
+                    for tc in tool_calls:
+                        fn = tc.get("function", tc)
+                        name = fn.get("name", "")
+                        args = fn.get("arguments", {})
+                        if isinstance(args, str):
+                            args = json.loads(args)
+                        tc_items.append(f'{{"{name}": {json.dumps(args)}}}')
+                else:
+                    tc_items.append(
+                        f'{{"{tool_call["name"]}": {json.dumps(tool_call["arguments"])}}}'
+                    )
+                tc_json = "[" + ", ".join(tc_items) + "]"
+                parts.append((
+                    f"<|assistant_start|>"
+                    f"<|tools_prefix|>{tc_json}<|tools_suffix|>"
+                    f"<|assistant_end|>"
+                , True))
+            elif thinking and "<think>" in content:
                 # Convert <think>...</think> to <|inner_prefix|>...<|inner_suffix|>
                 import re
                 match = re.match(r'<think>(.*?)</think>\s*(.*)', content, re.DOTALL)

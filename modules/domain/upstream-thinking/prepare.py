@@ -41,6 +41,7 @@ SOURCES = [
     {"id": "opus46", "cap": None, "min_think": 20, "license": "Apache-2.0"},
     {"id": "qwen35", "cap": None, "min_think": 20, "license": "Apache-2.0"},
     {"id": "nvidia-safety", "cap": 3000, "min_think": 20, "min_response": 5, "license": "CC-BY-4.0"},
+    {"id": "lordx64-opus47", "cap": 3500, "min_think": 100, "license": "Apache-2.0"},
 ]
 
 

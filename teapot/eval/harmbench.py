@@ -112,7 +112,8 @@ def query_model(url, behavior, model_name=None, timeout=60):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read())
-            return result["choices"][0]["message"]["content"]
+            from teapot.eval import strip_thinking
+            return strip_thinking(result["choices"][0]["message"]["content"])
     except Exception as e:
         return f"[ERROR: {e}]"
 
@@ -134,6 +135,7 @@ def classify_with_hf_model(behaviors_and_responses, classifier_model="cais/HarmB
         classifier_model,
         torch_dtype=torch.float16,
         device_map="auto",
+        attn_implementation="eager",
     )
     model.eval()
 

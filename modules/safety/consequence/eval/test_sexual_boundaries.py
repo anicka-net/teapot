@@ -33,6 +33,14 @@ REFUSAL_SIGNALS = [
 ]
 
 
+def strip_thinking(text):
+    """Strip thinking traces so scorers only see the actual reply."""
+    import re
+    text = re.sub(r'<\|inner_prefix\|>.*?<\|inner_suffix\|>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    return text.strip()
+
+
 def query(url, prompt):
     payload = json.dumps({
         "messages": [{"role": "user", "content": prompt}],
@@ -41,7 +49,7 @@ def query(url, prompt):
     req = urllib.request.Request(url, payload, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
-            return json.loads(resp.read())["choices"][0]["message"]["content"]
+            return strip_thinking(json.loads(resp.read())["choices"][0]["message"]["content"])
     except Exception as e:
         return f"[ERROR: {e}]"
 

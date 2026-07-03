@@ -321,7 +321,8 @@ def query_model(url, prompt, model_name=None, timeout=60):
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             result = json.loads(resp.read())
-            return result["choices"][0]["message"]["content"]
+            from teapot.eval import strip_thinking
+            return strip_thinking(result["choices"][0]["message"]["content"])
     except Exception as e:
         return f"[ERROR: {e}]"
 
