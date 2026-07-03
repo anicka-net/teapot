@@ -96,9 +96,13 @@ def fetch_local(path, module_name, filename=None, integrity=None):
     if integrity:
         actual = _sha256(cache_file)
         if actual != integrity:
-            print(f"  WARNING: Integrity check failed!")
+            # Fail closed: a pinned integrity hash that only warns is decorative.
+            # Corrupt/tampered/drifted data must NOT proceed into the pipeline.
+            print(f"  ERROR: Integrity check FAILED for {resolved}")
             print(f"    Expected: {integrity}")
             print(f"    Got:      {actual}")
+            cache_file.unlink(missing_ok=True)
+            return None
 
     return cache_file
 
@@ -133,6 +137,15 @@ def fetch_hf(repo, module_name, file=None, split=None, integrity=None, revision=
             downloaded_path = Path(downloaded)
             if downloaded_path != cache_file:
                 shutil.move(str(downloaded_path), str(cache_file))
+            # Verify the pinned hash on the FRESH download too (previously only
+            # checked on cache hit, so the pin never guarded the real fetch).
+            if integrity:
+                actual = _sha256(cache_file)
+                if actual != integrity:
+                    print(f"  ERROR: Integrity check FAILED for {repo}/{file}")
+                    print(f"    Expected: {integrity}\n    Got:      {actual}")
+                    cache_file.unlink(missing_ok=True)
+                    return None
             print(f"  Downloaded: {cache_file}")
             return cache_file
         except Exception as e:
@@ -154,6 +167,13 @@ def fetch_hf(repo, module_name, file=None, split=None, integrity=None, revision=
         try:
             ds = load_dataset(repo, split=split, revision=revision)
             ds.to_json(str(cache_file))
+            if integrity:
+                actual = _sha256(cache_file)
+                if actual != integrity:
+                    print(f"  ERROR: Integrity check FAILED for {repo} split={split}")
+                    print(f"    Expected: {integrity}\n    Got:      {actual}")
+                    cache_file.unlink(missing_ok=True)
+                    return None
             print(f"  Downloaded: {cache_file} ({len(ds)} examples)")
             return cache_file
         except Exception as e:
@@ -197,7 +217,10 @@ def fetch_url(url, module_name, filename=None, integrity=None):
         if integrity:
             actual = _sha256(cache_file)
             if actual != integrity:
-                print(f"  WARNING: Integrity check failed!")
+                print(f"  ERROR: Integrity check FAILED for {url}")
+                print(f"    Expected: {integrity}\n    Got:      {actual}")
+                cache_file.unlink(missing_ok=True)
+                return None
 
         return cache_file
     except Exception as e:
