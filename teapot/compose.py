@@ -486,9 +486,20 @@ def compose(config_path, output=None, dry_run=False):
 
     for module_name, data_info in module_data.items():
         count = sum(1 for e in weighted if e.get("_module") == module_name)
+        # Pin the module's declared license into the manifest at compose time,
+        # so the SBOM reads it from here rather than a live module.yaml that can
+        # drift after composition (the license is the field regulators care about
+        # most — it must be pinned, not re-read).
+        mod_license = "unknown"
+        myaml = TEAPOT_ROOT / "modules" / "/".join(module_name.split("/")) / "module.yaml"
+        if myaml.exists():
+            mmeta = yaml.safe_load(myaml.read_text()) or {}
+            linfo = mmeta.get("data", {}).get("licenses", {})
+            mod_license = linfo.get("default", mmeta.get("license", "unknown"))
         manifest["modules"][module_name] = {
             "source": str(data_info["path"]),
             "weight": data_info["weight"],
+            "license": mod_license,
             "examples_raw": sum(1 for e in all_examples if e.get("_module") == module_name),
             "examples_weighted": count,
             "examples_filtered_by_curation": data_info.get("load_stats", {}).get("filtered_curation", 0),
@@ -498,7 +509,10 @@ def compose(config_path, output=None, dry_run=False):
         if "curation" in data_info:
             manifest["modules"][module_name]["curation"] = data_info["curation"]
 
-    # Output hash for reproducibility
+    # Output file path + hash for reproducibility. Record the ACTUAL output path
+    # (may be a --output override the config doesn't know) so lockfile verify
+    # checks the real artifact instead of re-deriving it from the config.
+    manifest["output_file"] = str(out_path)
     manifest["output_hash"] = "sha256:" + sha256_file(out_path)
 
     manifest_path = out_path.with_suffix(".manifest.json")

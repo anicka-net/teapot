@@ -69,9 +69,15 @@ def generate_sbom(manifest_path, output=None):
     for module_name, module_info in manifest.get("modules", {}).items():
         mod_meta = load_module_metadata(module_name)
 
-        # Determine license
-        license_info = mod_meta.get("data", {}).get("licenses", {})
-        mod_license = license_info.get("default", mod_meta.get("license", "unknown"))
+        # Determine license. Prefer the value PINNED in the manifest at compose
+        # time — the live module.yaml can drift after composition, and the SBOM
+        # must describe what was actually composed. Fall back to module.yaml only
+        # for manifests predating license-pinning.
+        if "license" in module_info:
+            mod_license = module_info["license"]
+        else:
+            license_info = mod_meta.get("data", {}).get("licenses", {})
+            mod_license = license_info.get("default", mod_meta.get("license", "unknown"))
         all_licenses.add(mod_license)
 
         dataset = {

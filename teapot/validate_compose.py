@@ -163,8 +163,8 @@ def check_content(examples, expected_tier=None):
     return errors, warnings
 
 
-def check_manifest(examples, manifest_path):
-    """Verify manifest matches actual output."""
+def check_manifest(examples, manifest_path, input_path=None):
+    """Verify manifest matches actual output — count AND output_hash."""
     errors = 0
 
     with open(manifest_path) as f:
@@ -177,8 +177,25 @@ def check_manifest(examples, manifest_path):
     else:
         log(f"Example count matches manifest: {len(examples)}", "PASS")
 
-    # Per-module counts (check _module field if present, otherwise by category heuristic)
-    # Since we strip _module in output, check by counting
+    # Output hash — the tamper check. Re-hash the actual composed file with the
+    # same method compose uses (sha256 of raw bytes, "sha256:"-prefixed).
+    expected = manifest.get("output_hash", "")
+    if expected and input_path:
+        h = hashlib.sha256()
+        with open(input_path, "rb") as f:
+            for chunk in iter(lambda: f.read(4096), b""):
+                h.update(chunk)
+        actual = "sha256:" + h.hexdigest()
+        if actual != expected:
+            log("Output hash MISMATCH — file does not match manifest", "FAIL")
+            log(f"  expected: {expected}")
+            log(f"  got:      {actual}")
+            errors += 1
+        else:
+            log("Output hash matches manifest (file untampered)", "PASS")
+    elif not expected:
+        log("Manifest has no output_hash to verify", "WARN")
+
     log(f"Manifest modules: {list(manifest.get('modules', {}).keys())}")
 
     return errors
@@ -306,7 +323,7 @@ def main():
     # 3. Manifest
     if args.manifest:
         print("--- Manifest Validation ---")
-        e = check_manifest(examples, args.manifest)
+        e = check_manifest(examples, args.manifest, args.input)
         total_errors += e
         print()
 

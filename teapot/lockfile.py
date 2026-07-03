@@ -41,6 +41,7 @@ def generate_lock(manifest_path, lock_path=None):
         "config": manifest.get("config", ""),
         "seed": manifest.get("seed", 42),
         "sources": {},
+        "output_file": manifest.get("output_file", ""),
         "output_hash": manifest.get("output_hash", ""),
     }
 
@@ -101,27 +102,37 @@ def verify_lock(lock_path):
         else:
             print(f"  [-] {module_name}: no hash to verify")
 
-    # Check output hash if we can find the output file
+    # Check the output-artifact hash. Any failure to verify is a FAILURE, not a
+    # silent skip — the old `except: pass` let a run still report "all match".
     output_hash = lock.get("output_hash", "")
     if output_hash:
-        # Try to find the output file from the config
-        config_path = lock.get("config", "")
-        if config_path:
+        # Prefer the actual output path recorded at compose time (robust to
+        # --output overrides); fall back to deriving it from the config only for
+        # old locks that predate output_file.
+        output_file = lock.get("output_file", "")
+        if not output_file:
+            config_path = lock.get("config", "")
             try:
                 import yaml
-                cfg = yaml.safe_load(open(config_path))
-                output_file = cfg.get("output", {})
-                if isinstance(output_file, dict):
-                    output_file = output_file.get("file", "train.jsonl")
-                if Path(output_file).exists():
-                    current = hash_file(output_file)
-                    if current == output_hash:
-                        print(f"\n  [+] Output: OK")
-                    else:
-                        print(f"\n  [X] Output: CHANGED")
-                        all_ok = False
-            except Exception:
-                pass
+                cfg = yaml.safe_load(open(config_path)) if config_path else {}
+                of = cfg.get("output", {})
+                output_file = of.get("file", "") if isinstance(of, dict) else (of or "")
+            except Exception as e:
+                print(f"\n  [X] Output: cannot read config to locate output ({e})")
+                all_ok = False
+
+        if output_file and Path(output_file).exists():
+            if hash_file(output_file) == output_hash:
+                print(f"\n  [+] Output: OK")
+            else:
+                print(f"\n  [X] Output: CHANGED")
+                all_ok = False
+        elif output_file:
+            print(f"\n  [X] Output: file not found ({output_file}) — cannot verify")
+            all_ok = False
+        else:
+            print(f"\n  [X] Output: could not resolve output file — cannot verify")
+            all_ok = False
 
     print()
     if all_ok:
