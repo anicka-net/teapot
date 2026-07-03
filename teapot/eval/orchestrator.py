@@ -165,6 +165,7 @@ def run_tool_test(test, module_name, url, model_name="",
             max_attack_rate=test.get("max_attack_rate", 0.10),
             model_name=model_name or None,
             use_classifier=test.get("use_classifier", True),
+            fast=test.get("fast", False),
         )
 
     if tool == "strongreject":
@@ -173,6 +174,8 @@ def run_tool_test(test, module_name, url, model_name="",
             url=url,
             max_score=test.get("max_score", 0.10),
             model_name=model_name or None,
+            fast=test.get("fast", False),
+            judge_url=test.get("judge_url"),
         )
 
     if tool == "cbbench":
