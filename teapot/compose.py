@@ -154,7 +154,7 @@ def run_prepare(module_dir, module_name, chat_template="chatml", include_reasoni
         # Check if data already exists
         data_dir = module_dir / "data"
         if data_dir.exists():
-            jsonl_files = list(data_dir.glob("*.jsonl"))
+            jsonl_files = sorted(data_dir.glob("*.jsonl"))  # sorted: deterministic pick
             if jsonl_files:
                 log(f"  Using existing data: {jsonl_files[0].name}")
                 return jsonl_files[0]
@@ -200,7 +200,7 @@ def run_prepare(module_dir, module_name, chat_template="chatml", include_reasoni
     # Find the output file
     data_dir = module_dir / "data"
     if data_dir.exists():
-        jsonl_files = list(data_dir.glob("*.jsonl"))
+        jsonl_files = sorted(data_dir.glob("*.jsonl"))  # sorted: deterministic pick
         if jsonl_files:
             return jsonl_files[0]
 
@@ -273,7 +273,11 @@ def load_examples(data_path, module_name, weight=1.0, licenses_allowed=None,
             # License filtering
             if licenses_allowed:
                 ex_license = ex.get("license", "unknown")
-                if ex_license not in licenses_allowed and "unknown" not in licenses_allowed:
+                # NOTE: allow "unknown" only by listing it explicitly in
+                # licenses_allowed. The old `and "unknown" not in licenses_allowed`
+                # made the whole predicate false for EVERY license the moment
+                # "unknown" was allowed — silently disabling all filtering.
+                if ex_license not in licenses_allowed:
                     filtered_license += 1
                     continue
 

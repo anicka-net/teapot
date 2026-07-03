@@ -107,7 +107,14 @@ def run_script_test(test, module_name, url, timeout=600):
         data = json.loads(result.stdout)
         passed = data.get("passed", 0)
         total = data.get("total", 0)
-        status = "pass" if data.get("pass", data.get("passed") == data.get("total")) else "fail"
+        # A suite passes ONLY on an explicit pass flag, or when something
+        # actually ran (total > 0) and every item passed. The old default
+        # `data.get("passed") == data.get("total")` made a missing-keys or
+        # zero-items result (None == None, or 0 == 0) a silent PASS.
+        if "pass" in data:
+            status = "pass" if data["pass"] else "fail"
+        else:
+            status = "pass" if (total > 0 and passed == total) else "fail"
     except (json.JSONDecodeError, TypeError):
         # Fallback: check exit code
         status = "pass" if result.returncode == 0 else "fail"

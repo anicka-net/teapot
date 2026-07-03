@@ -13,6 +13,7 @@ Usage:
 
 import argparse
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -71,8 +72,11 @@ def detect_gpus():
 def estimate_model_memory(model_name, method="qlora"):
     """Estimate GPU memory needed for a model."""
     name_lower = model_name.lower()
-    for size_key, gb in MODEL_SIZES.items():
-        if size_key in name_lower:
+    # Word-boundary match so "3b" doesn't match "13b" and "7b" doesn't match
+    # "27b"/"17b" (plain substring `in` did, mis-sizing those by 3-4x). Try
+    # longest keys first so "13b" wins over any shorter accidental overlap.
+    for size_key, gb in sorted(MODEL_SIZES.items(), key=lambda kv: -len(kv[0])):
+        if re.search(r'(?<![0-9a-z])' + re.escape(size_key) + r'(?![0-9a-z])', name_lower):
             if method == "qlora":
                 return gb  # QLoRA: ~model weights in 4bit + overhead
             elif method == "lora":
