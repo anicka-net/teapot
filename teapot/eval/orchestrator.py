@@ -3,7 +3,8 @@
 Teapot Eval — config-driven evaluation pipeline.
 
 Reads module.yaml eval declarations from enabled modules and runs
-the appropriate tests for the requested tier.
+the appropriate tests for the requested tier. Private held-out suites
+can be declared as integrity-pinned sealed runners in the Teapot config.
 
 Usage:
     python3 scripts/eval/orchestrator.py configs/karma-electric.config --tier standard --url URL
@@ -33,6 +34,27 @@ def load_config(config_path):
     with open(config_path) as f:
         cfg = yaml.safe_load(f)
     return {name: True for name, enabled in cfg.get("modules", {}).items() if enabled}
+
+
+def load_sealed_evals(config_path, max_tier):
+    """Load config-level private eval declarations for the requested tier.
+
+    Only metadata is read here. The actual suite path is resolved later from
+    the declared environment variable, so private prompts never need to be
+    present in the repository or configuration file.
+    """
+    with open(config_path) as f:
+        cfg = yaml.safe_load(f) or {}
+
+    sealed = []
+    for spec in cfg.get("eval", {}).get("sealed_suites", []):
+        tier_name = spec.get("tier", "full")
+        if TIER_ORDER.get(tier_name, 99) <= max_tier:
+            entry = dict(spec)
+            entry["_tier"] = tier_name
+            entry["_sealed"] = True
+            sealed.append(entry)
+    return sealed
 
 
 def load_module_evals(module_name, max_tier):
@@ -220,11 +242,12 @@ def main():
     print(f"Modules: {', '.join(modules.keys())}")
     print()
 
-    # Collect all tests
+    # Collect module-declared tests plus config-level sealed suites.
     all_tests = []
     for module_name in modules:
         tests = load_module_evals(module_name, max_tier)
         all_tests.extend(tests)
+    all_tests.extend(load_sealed_evals(args.config, max_tier))
 
     if not all_tests:
         print("No eval tests found for this config/tier.")
@@ -232,8 +255,13 @@ def main():
 
     print(f"Tests to run: {len(all_tests)}")
     for t in all_tests:
-        kind = "script" if "script" in t else f"tool:{t.get('tool', '?')}"
-        print(f"  [{t['_tier']}] {t['_module']}: {kind}")
+        if t.get("_sealed"):
+            kind = f"sealed:{t.get('name', '?')} via ${t.get('path_env', '?')}"
+            owner = "private"
+        else:
+            kind = "script" if "script" in t else f"tool:{t.get('tool', '?')}"
+            owner = t["_module"]
+        print(f"  [{t['_tier']}] {owner}: {kind}")
     print()
 
     if args.dry_run:
@@ -250,19 +278,27 @@ def main():
 
     t0 = time.time()
     for test in all_tests:
-        module = test["_module"]
-        if "script" in test:
-            result = run_script_test(test, module, args.url)
-        elif "tool" in test:
-            result = run_tool_test(test, module, args.url,
-                                    model_name=args.model_name,
-                                    garak_bin=args.garak_bin,
-                                    garak_ssh=args.garak_ssh)
-        else:
-            result = SuiteResult(
-                name=f"{module}:unknown", status="skip",
-                passed=0, total=0, error="No script or tool specified",
+        if test.get("_sealed"):
+            from teapot.eval.sealed import run_sealed_suite
+            result = run_sealed_suite(
+                test,
+                args.url,
+                model_name=args.model_name,
             )
+        else:
+            module = test["_module"]
+            if "script" in test:
+                result = run_script_test(test, module, args.url)
+            elif "tool" in test:
+                result = run_tool_test(test, module, args.url,
+                                       model_name=args.model_name,
+                                       garak_bin=args.garak_bin,
+                                       garak_ssh=args.garak_ssh)
+            else:
+                result = SuiteResult(
+                    name=f"{module}:unknown", status="skip",
+                    passed=0, total=0, error="No script or tool specified",
+                )
 
         report.add_suite(result)
         icon = {"pass": "+", "fail": "X", "error": "!", "skip": "-"}[result.status]
