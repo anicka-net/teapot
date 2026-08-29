@@ -4,11 +4,14 @@ Teapot lockfile — pin data sources for reproducible builds.
 
 The lockfile records full SHA-256 hashes of every data source and
 the composed output. Same lockfile + same sources = same training data.
+It also records a build identity for the config, Teapot source revision,
+and relevant runtime package versions.
 
 Usage:
     python3 scripts/lockfile.py generate manifest.json
     python3 scripts/lockfile.py generate manifest.json --output teapot.lock
     python3 scripts/lockfile.py verify teapot.lock
+    python3 scripts/lockfile.py verify teapot.lock --build
 """
 
 import argparse
@@ -18,6 +21,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+from teapot.provenance import collect_build_identity, identity_hash
 from teapot.root import find_root
 TEAPOT_ROOT = find_root()
 
@@ -35,14 +39,19 @@ def generate_lock(manifest_path, lock_path=None):
     """Generate a lockfile from a compose manifest."""
     manifest = json.loads(Path(manifest_path).read_text())
 
+    config_path = manifest.get("config", "")
+    build_identity = collect_build_identity(config_path, TEAPOT_ROOT)
+
     lock = {
         "version": 1,
         "generated": datetime.now().isoformat(),
-        "config": manifest.get("config", ""),
+        "config": config_path,
         "seed": manifest.get("seed", 42),
         "sources": {},
         "output_file": manifest.get("output_file", ""),
         "output_hash": manifest.get("output_hash", ""),
+        "build_identity": build_identity,
+        "build_id": identity_hash(build_identity),
     }
 
     for module_name, module_info in manifest.get("modules", {}).items():
@@ -69,16 +78,25 @@ def generate_lock(manifest_path, lock_path=None):
         json.dump(lock, f, indent=2)
 
     print(f"Generated {out} ({len(lock['sources'])} sources)")
+    print(f"Build ID: {lock['build_id']}")
     return lock
 
 
-def verify_lock(lock_path):
-    """Verify current data against a lockfile. Returns True if all match."""
+def verify_lock(lock_path, verify_build=False):
+    """Verify current data against a lockfile. Returns True if all match.
+
+    ``verify_build`` additionally checks the config, Teapot source revision,
+    Python runtime, and installed training-stack package versions recorded at
+    lock generation time. It is opt-in so existing source-only verification
+    workflows remain backward compatible.
+    """
     lock = json.loads(Path(lock_path).read_text())
     all_ok = True
 
     print(f"Verifying {lock_path} (generated {lock['generated']})")
     print(f"Config: {lock['config']}")
+    if lock.get("build_id"):
+        print(f"Build ID: {lock['build_id']}")
     print()
 
     for module_name, entry in lock.get("sources", {}).items():
@@ -134,9 +152,29 @@ def verify_lock(lock_path):
             print(f"\n  [X] Output: could not resolve output file — cannot verify")
             all_ok = False
 
+    if verify_build:
+        expected_identity = lock.get("build_identity")
+        if not expected_identity:
+            print("\n  [X] Build: lockfile has no build identity")
+            all_ok = False
+        else:
+            current_identity = collect_build_identity(lock.get("config", ""), TEAPOT_ROOT)
+            current_id = identity_hash(current_identity)
+            expected_id = lock.get("build_id") or identity_hash(expected_identity)
+            if current_id == expected_id and current_identity == expected_identity:
+                print("\n  [+] Build: identity matches")
+            else:
+                print("\n  [X] Build: identity changed")
+                print(f"      expected: {expected_id}")
+                print(f"      current:  {current_id}")
+                all_ok = False
+
     print()
     if all_ok:
-        print("RESULT: All sources match lockfile")
+        if verify_build:
+            print("RESULT: Sources, output, and build identity match lockfile")
+        else:
+            print("RESULT: All sources match lockfile")
     else:
         print("RESULT: Sources have changed — re-run compose or update lock")
 
@@ -153,13 +191,15 @@ def main():
 
     ver = sub.add_parser("verify", help="Verify sources against lockfile")
     ver.add_argument("lockfile", help="Lockfile path")
+    ver.add_argument("--build", action="store_true",
+                     help="Also verify config, Teapot source, and runtime identity")
 
     args = parser.parse_args()
 
     if args.command == "generate":
         generate_lock(args.manifest, args.output)
     elif args.command == "verify":
-        ok = verify_lock(args.lockfile)
+        ok = verify_lock(args.lockfile, verify_build=args.build)
         sys.exit(0 if ok else 1)
     else:
         parser.print_help()
