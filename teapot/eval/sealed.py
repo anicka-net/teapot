@@ -35,6 +35,29 @@ def _flatten_args(args):
     return [str(value) for value in (args or [])]
 
 
+def _aggregate_result(data):
+    """Validate sanitized suite output and return (status, passed, total)."""
+    if not isinstance(data, dict):
+        raise ValueError("aggregate must be a JSON object")
+
+    passed = data.get("passed", 0)
+    total = data.get("total", 0)
+    if not isinstance(passed, int) or isinstance(passed, bool) or passed < 0:
+        raise ValueError("passed must be a non-negative integer")
+    if not isinstance(total, int) or isinstance(total, bool) or total < 0:
+        raise ValueError("total must be a non-negative integer")
+
+    if "pass" in data:
+        explicit = data["pass"]
+        if not isinstance(explicit, bool):
+            raise ValueError("pass must be a boolean")
+        status = "pass" if explicit else "fail"
+    else:
+        status = "pass" if total > 0 and passed == total else "fail"
+
+    return status, passed, total
+
+
 def run_sealed_suite(spec, url, model_name="", timeout=600):
     """Run one private suite without opening its prompt/output artifacts.
 
@@ -117,7 +140,8 @@ def run_sealed_suite(spec, url, model_name="", timeout=600):
     # error message. A sealed runner must expose aggregates only.
     try:
         data = json.loads(proc.stdout)
-    except (json.JSONDecodeError, TypeError):
+        status, passed, total = _aggregate_result(data)
+    except (json.JSONDecodeError, TypeError, ValueError):
         return SuiteResult(
             name=f"sealed:{name}",
             status="error",
@@ -125,26 +149,19 @@ def run_sealed_suite(spec, url, model_name="", timeout=600):
             total=0,
             duration_seconds=elapsed,
             details={"sealed": True, "path_env": env_name, "integrity": actual},
-            error="Sealed suite did not return aggregate JSON",
+            error="Sealed suite did not return valid aggregate JSON",
         )
 
     if proc.returncode != 0:
         return SuiteResult(
             name=f"sealed:{name}",
             status="error",
-            passed=int(data.get("passed", 0) or 0),
-            total=int(data.get("total", 0) or 0),
+            passed=passed,
+            total=total,
             duration_seconds=elapsed,
             details={"sealed": True, "path_env": env_name, "integrity": actual},
             error=f"Sealed suite exited with status {proc.returncode}",
         )
-
-    passed = int(data.get("passed", 0) or 0)
-    total = int(data.get("total", 0) or 0)
-    if "pass" in data:
-        status = "pass" if bool(data["pass"]) else "fail"
-    else:
-        status = "pass" if total > 0 and passed == total else "fail"
 
     return SuiteResult(
         name=f"sealed:{name}",
