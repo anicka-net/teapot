@@ -109,6 +109,43 @@ def test_malformed_stdout_is_not_copied_into_report(tmp_path, monkeypatch):
     assert "PRIVATE RAW OUTPUT" not in json.dumps(result.details)
 
 
+def test_structured_but_invalid_aggregate_fails_closed(tmp_path, monkeypatch):
+    runner = _runner(
+        tmp_path,
+        "import json\nprint(json.dumps({'pass': 'false', 'passed': '7', 'total': 7}))\n",
+    )
+    monkeypatch.setenv("TEAPOT_PRIVATE_EVAL", str(runner))
+
+    result = run_sealed_suite(
+        {
+            "name": "heldout",
+            "path_env": "TEAPOT_PRIVATE_EVAL",
+            "integrity": _digest(runner),
+        },
+        "http://model",
+    )
+
+    assert result.status == "error"
+    assert result.passed == 0
+    assert result.total == 0
+
+
+def test_json_array_is_not_an_aggregate(tmp_path, monkeypatch):
+    runner = _runner(tmp_path, "print('[1, 1]')\n")
+    monkeypatch.setenv("TEAPOT_PRIVATE_EVAL", str(runner))
+
+    result = run_sealed_suite(
+        {
+            "name": "heldout",
+            "path_env": "TEAPOT_PRIVATE_EVAL",
+            "integrity": _digest(runner),
+        },
+        "http://model",
+    )
+
+    assert result.status == "error"
+
+
 def test_sealed_suite_tier_selection(tmp_path):
     config = tmp_path / "model.config"
     config.write_text(yaml.safe_dump({
