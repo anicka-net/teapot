@@ -176,7 +176,7 @@ def verify_lock(lock_path, verify_build=False):
         else:
             print("RESULT: All sources match lockfile")
     else:
-        print("RESULT: Sources have changed — re-run compose or update lock")
+        print("RESULT: Lock verification failed")
 
     return all_ok
 
