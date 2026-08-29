@@ -1,4 +1,3 @@
-
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "Teapot Configuration Schema",
@@ -88,7 +87,35 @@
       "type": "object",
       "properties": {
         "required": { "type": "boolean" },
-        "abort_on_failure": { "type": "boolean" }
+        "abort_on_failure": { "type": "boolean" },
+        "sealed_suites": {
+          "type": "array",
+          "description": "Private integrity-pinned eval runners resolved only from environment variables",
+          "items": {
+            "type": "object",
+            "required": ["name", "path_env", "integrity"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "tier": {
+                "type": "string",
+                "enum": ["fast", "standard", "full"],
+                "default": "full"
+              },
+              "path_env": {
+                "type": "string",
+                "pattern": "^[A-Z_][A-Z0-9_]*$"
+              },
+              "integrity": {
+                "type": "string",
+                "pattern": "^sha256:[0-9a-fA-F]{64}$"
+              },
+              "required": { "type": "boolean", "default": true },
+              "args": { "type": ["array", "object"] },
+              "pass_criteria": { "type": ["object", "string"] }
+            },
+            "additionalProperties": false
+          }
+        }
       },
       "additionalProperties": true,
       "default": {}
