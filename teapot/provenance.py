@@ -12,7 +12,6 @@ import importlib.metadata
 import json
 import platform
 import subprocess
-import sys
 from pathlib import Path
 
 import yaml
@@ -45,14 +44,19 @@ def hash_file(path):
 
 
 def git_state(root):
-    """Return the current source commit and whether the worktree is dirty."""
+    """Return source commit and tracked-worktree state.
+
+    Generated training artifacts are commonly untracked and must not make a
+    build identity unstable merely by existing. Tracked modifications still
+    mark the source tree dirty.
+    """
     try:
         commit = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=str(root), capture_output=True, text=True, timeout=2, check=True,
         ).stdout.strip()
         dirty = bool(subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "status", "--porcelain", "--untracked-files=no"],
             cwd=str(root), capture_output=True, text=True, timeout=2, check=True,
         ).stdout.strip())
         return {"commit": commit, "dirty": dirty}
